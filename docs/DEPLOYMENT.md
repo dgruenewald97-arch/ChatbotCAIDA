@@ -58,7 +58,7 @@ Das Secret gehört weder in `.env`, GitHub noch in das Browserformular. Vercel-E
 
 ### Demo-Kostenbremse
 
-- automatische Auswahl des neuesten stabilen Flash-Lite-Modells, das die Google-API für den Key tatsächlich meldet;
+- automatische Auswahl des neuesten stabilen Flash-Lite-Modells oder ein explizit gepinntes, zuvor live verifiziertes Modell über `CAIDA_AI_MODEL`;
 - höchstens sechs vorangehende Chatnachrichten, gekürzt auf je 700 Zeichen;
 - Nutzerfrage höchstens 1.200 Zeichen;
 - Antwort höchstens 260 Output-Tokens;
