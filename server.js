@@ -22,7 +22,7 @@ const MIME = {
 
 let aiProvider = process.env.GEMINI_API_KEY ? "gemini" : process.env.OPENAI_API_KEY ? "openai" : "none";
 let aiKey = process.env.GEMINI_API_KEY || process.env.OPENAI_API_KEY || "";
-let aiModel = process.env.CAIDA_AI_MODEL || (aiProvider === "openai" ? "gpt-5-mini" : "gemini-3.5-flash-lite");
+let aiModel = process.env.CAIDA_AI_MODEL || (aiProvider === "openai" ? "gpt-5-mini" : "gemini-2.5-flash-lite");
 let lastAIError = null;
 let aiConfiguredAt = aiKey ? new Date().toISOString() : null;
 const AI_INSTRUCTIONS = `<rolle>
@@ -141,7 +141,7 @@ async function resolveGeminiModel(key, requestedModel = "auto") {
   const available = new Set((result.models || [])
     .filter(model => !model.supportedGenerationMethods || model.supportedGenerationMethods.includes("generateContent"))
     .map(model => String(model.name || "").replace(/^models\//, "")));
-  const candidates = [requestedModel, "gemini-3.5-flash-lite", "gemini-3.1-flash-lite", "gemini-2.5-flash-lite", "gemini-3.7-flash", "gemini-3.6-flash", "gemini-3.5-flash"]
+  const candidates = [requestedModel, "gemini-2.5-flash-lite", "gemini-2.5-flash"]
     .filter(model => model && model !== "auto");
   const resolved = candidates.find(model => available.has(model));
   if (!resolved) throw new Error("Der Key ist gültig, aber kein kompatibles Flash-Lite-Modell ist für dieses Projekt freigeschaltet.");
@@ -199,7 +199,7 @@ const server = http.createServer(async (req, res) => {
       const payload = JSON.parse(await readBody(req));
       const provider = String(payload?.provider || "gemini").trim().toLowerCase();
       const key = String(payload?.key || "").trim();
-      const model = String(payload?.model || (provider === "openai" ? "gpt-5-mini" : "gemini-3.5-flash-lite")).trim();
+      const model = String(payload?.model || (provider === "openai" ? "gpt-5-mini" : "gemini-2.5-flash-lite")).trim();
       if (!/^(gemini|openai)$/.test(provider)) return sendJson(res, 400, { error: "Unbekannter KI-Anbieter." });
       const keyIsValid = provider === "gemini" ? isPlausibleSecret(key) : /^sk-[A-Za-z0-9_-]{20,}$/.test(key);
       if (!keyIsValid) return sendJson(res, 400, { error: `Der ${providerLabel(provider)} API-Key hat kein gültiges Format.` });

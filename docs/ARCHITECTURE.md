@@ -43,6 +43,18 @@ Der dependency-freie Node-Server:
 - sendet freie Fragen mit Systemanweisung und gekürztem Kontext an den Anbieter;
 - gibt den API-Key niemals an den Browser zurück.
 
+### `api/` und `lib/`
+
+Die Vercel-Version läuft unter derselben Origin wie das Frontend:
+
+- `api/ai-status.js` meldet ausschließlich Verbindungsstatus und Modellname;
+- `api/ai-chat.js` validiert Origin, Payload und ein weiches IP-Rate-Limit;
+- `api/demo-lead.js` bestätigt nur eine Demo-Referenz und persistiert keine Kontaktdaten;
+- `lib/caida-ai.js` besitzt den serverseitigen Prompt, die geprüfte Modell-Allowlist und harte Kontext-/Antwortgrenzen;
+- `GEMINI_API_KEY` wird ausschließlich aus Vercel Environment Variables gelesen.
+
+Auf Vercel wird niemals ein API-Key-Formular angeboten. Das Frontend erkennt den Modus über `managed: true` aus `/api/ai-status`.
+
 ## Routing-Reihenfolge
 
 Die Reihenfolge ist ein Sicherheitsvertrag:
@@ -68,10 +80,14 @@ Transaktionale Absichten dürfen nie hinter dem KI-Aufruf stehen. Andernfalls k�
 
 Mit `?static=1` kann dieser Modus lokal getestet werden.
 
+## Vercel-Modus
+
+Auf einer Vercel-Domain ist `STATIC_HOSTED` nicht aktiv. Freie Fragen gehen an den gleichnamigen Serverless-Endpunkt `/api/ai-chat`; Intent-Routing und alle transaktionalen Widgets bleiben weiterhin im Browser kontrolliert. Ein Ausfall oder Rate-Limit fällt auf die geprüfte lokale Antwortlogik zurück.
+
 ## Sicherheitsgrenzen
 
 - Modellfakten stammen nur aus der dokumentierten Datenbasis.
 - Wettbewerberwissen wird nicht aus Modellvorwissen ergänzt.
 - Händlerkarten bestätigen weder Fahrzeugbestand noch Terminverfügbarkeit.
 - Erst ein zukünftiges Backend dürfte Consent, CRM-Übergabe und Statusrückmeldung übernehmen.
-
+- Das Vercel-Backend ist ein Demo-Gateway, keine CRM- oder Buchungsschnittstelle.

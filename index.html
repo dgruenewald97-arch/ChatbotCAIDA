@@ -119,7 +119,7 @@
     </details>
     <details class="ai-config-details">
       <summary>KI-Verbindung <span id="ai-config-state">nicht aktiv</span></summary>
-      <p>Der Schlüssel bleibt nur im Arbeitsspeicher dieses lokalen Servers und wird nie an den Browser zurückgegeben.</p>
+      <p id="ai-config-copy">Lokal kann ein Key temporär verbunden werden. Auf Vercel wird Gemini ausschließlich als geschütztes Server-Secret konfiguriert.</p>
       <form id="ai-config-form">
         <label for="ai-provider">Anbieter</label>
         <select id="ai-provider" name="provider">
@@ -129,7 +129,7 @@
         <label for="ai-key" id="ai-key-label">Gemini API-Key</label>
         <input id="ai-key" name="key" type="password" autocomplete="off" autocapitalize="none" spellcheck="false" placeholder="AQ… oder AIza…" required>
         <label for="ai-model">Modell</label>
-        <input id="ai-model" name="model" value="gemini-3.5-flash-lite" autocomplete="off">
+        <input id="ai-model" name="model" value="gemini-2.5-flash-lite" autocomplete="off">
         <button class="button button--primary" type="submit">KI im Chat verbinden</button>
       </form>
       <p id="ai-config-message" role="status"></p>

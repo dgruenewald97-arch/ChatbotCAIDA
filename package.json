@@ -5,10 +5,9 @@
   "description": "CAIDA Mitsubishi conversational commerce concept prototype",
   "scripts": {
     "start": "node server.js",
-    "check": "node --check app.js && node --check server.js"
+    "check": "node --check app.js && node --check server.js && node --check lib/caida-ai.js && node --check lib/caida-http.js && node --check api/ai-status.js && node --check api/ai-chat.js && node --check api/demo-lead.js && node --check api/health.js && node scripts/smoke-api.js"
   },
   "engines": {
-    "node": ">=18"
+    "node": "22.x"
   }
 }
-

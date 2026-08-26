@@ -30,7 +30,48 @@ CAIDA_PORT
 
 Keys aus der UI bleiben nur im Arbeitsspeicher und werden nie an den Browser zurückgegeben.
 
-## Produktiver KI-Betrieb
+## Vercel: öffentliche Gemini-Demo
+
+Die Vercel-Version hostet Frontend und Functions unter derselben Domain. Benötigt werden:
+
+```text
+GEMINI_API_KEY       erforderlich, nur als Vercel-Secret
+CAIDA_AI_MODEL       optional: gemini-2.5-flash-lite oder gemini-2.5-flash
+CAIDA_ALLOWED_ORIGIN optional: zusätzliche exakt erlaubte Origin
+```
+
+Erst verbinden und einmal deployen:
+
+```bash
+vercel login
+vercel --prod
+```
+
+Secret setzen und danach neu deployen:
+
+```bash
+vercel env add GEMINI_API_KEY production
+vercel --prod
+```
+
+Das Secret gehört weder in `.env`, GitHub noch in das Browserformular. Vercel-Environment-Änderungen gelten erst für neue Deployments.
+
+### Demo-Kostenbremse
+
+- Standardmodell: `gemini-2.5-flash-lite`;
+- höchstens sechs vorangehende Chatnachrichten, gekürzt auf je 700 Zeichen;
+- Nutzerfrage höchstens 1.200 Zeichen;
+- Antwort höchstens 260 Output-Tokens;
+- zwölf KI-Anfragen pro Minute und IP je warmer Function-Instanz;
+- 18 Sekunden Upstream-Timeout und lokaler Fakten-Fallback im Browser.
+
+Der In-Memory-Rate-Limiter ist bewusst nur ein Schutz für die Chef-Demo. Vor öffentlicher Kampagnennutzung müssen ein zentraler Rate-Limiter, Bot-Schutz, Monitoring sowie Budgetalarme im Google-Projekt ergänzt werden.
+
+### Keine echte Lead-Übermittlung
+
+`/api/demo-lead` erzeugt lediglich eine nicht persistierte Demo-Referenz. Name und Kontakt werden weder an Mitsubishi noch an einen Händler weitergegeben und nicht serverseitig gespeichert.
+
+## Produktiver KI-Betrieb jenseits der Demo
 
 Für eine öffentliche KI-Version ist ein separates Backend erforderlich. Mindestanforderungen:
 
@@ -47,4 +88,3 @@ GitHub Pages kann weiterhin das Frontend hosten, wenn `/api/*` auf einen sichere
 ## Produktive Händlerübergabe
 
 Die lokale Demo-Inbox ist kein CRM. Eine echte Übergabe benötigt Partner-ID, Consent, sichere Kontaktdatenübertragung, Fehlerstatus und eine bestätigte Rückmeldung. Erst dann darf der Chat „gesendet“ oder „gebucht“ anzeigen.
-

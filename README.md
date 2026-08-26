@@ -1,6 +1,6 @@
 # CAIDA – Mitsubishi Conversational Commerce Prototype
 
-[Live-Demo öffnen](https://dgruenewald97-arch.github.io/ChatbotCAIDA/)
+[Vercel-Demo mit Gemini öffnen](https://chatbot-caida.vercel.app/) · [GitHub-Pages-Fallback öffnen](https://dgruenewald97-arch.github.io/ChatbotCAIDA/)
 
 CAIDA ist ein Mobile-First-Konzept für eine Mitsubishi Modellberatung, die vollständig im Chat stattfindet. Der Assistent berät, merkt sich relevanten Kontext und wechselt bei transaktionalen Absichten in kontrollierte Widgets für Händlersuche, Probefahrt und Angebotsvorbereitung.
 
@@ -22,13 +22,14 @@ CAIDA ist ein Mobile-First-Konzept für eine Mitsubishi Modellberatung, die voll
 | Modus | Geeignet für | KI | Datenübertragung |
 | --- | --- | --- | --- |
 | GitHub Pages | Teilen, Präsentieren, mobile Tests | lokale Regel- und Widgetlogik | Formulardaten bleiben im Browserzustand |
+| Vercel | Öffentliche Chef-Demo mit freien Fragen | serverseitiges Gemini 2.5 Flash-Lite | nur freie Fragen und gekürzter Chatkontext an Gemini |
 | Lokaler Node-Server | Entwicklung und Gemini-Demo | optionaler serverseitiger Gemini-/OpenAI-Gateway | nur nach sichtbarer Aktivierung zum gewählten KI-Anbieter |
 
-Auf GitHub Pages wird absichtlich **kein API-Key im Frontend** abgefragt. Für eine produktive Online-KI ist ein abgesicherter Backend-Proxy erforderlich.
+Auf GitHub Pages wird absichtlich **kein API-Key im Frontend** abgefragt. Die Vercel-Version verwendet dafür Functions und ein serverseitiges `GEMINI_API_KEY`-Secret. Details stehen in [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md).
 
 ## Lokal starten
 
-Voraussetzung: Node.js 18 oder neuer.
+Voraussetzung: Node.js 22.
 
 ```bash
 npm start
@@ -62,13 +63,16 @@ Die transaktionalen Wege laufen immer vor der freien KI. Dadurch kann ein Modell
 ├── styles.css                 Mobile-First Layout, Widgets und Motion
 ├── app.js                     Dialogzustand, Intent-Routing und UI-Flows
 ├── server.js                  Statischer Server und optionaler KI-Gateway
+├── api/                       Vercel Functions für Status, Chat und Demo-Flow
+├── lib/                       Gemeinsame KI- und HTTP-Sicherheitslogik
+├── vercel.json                Functions- und Security-Header-Konfiguration
 ├── assets/                    Fahrzeug-, Marken- und Bot-Assets
 ├── docs/
 │   ├── ARCHITECTURE.md        Zustände, Routing und technische Grenzen
 │   ├── CONVERSATION-DESIGN.md Sprache, Flow-Verträge und UX-Regeln
 │   ├── FINETUNING.md          Konkreter Leitfaden zum Weiterentwickeln
 │   ├── DATA-GOVERNANCE.md     Faktenbasis und Aktualisierung
-│   └── DEPLOYMENT.md          Pages, lokal und zukünftiges Backend
+│   └── DEPLOYMENT.md          Pages, lokal und Vercel-Backend
 ├── QUELLEN.md                 Aktuelle Datenquellen
 └── .github/workflows/pages.yml
 ```
@@ -91,6 +95,5 @@ Danach die relevanten Dialoge sowohl auf Desktop als auch bei ungefähr `390 × 
 - keine Händler-/CRM- oder Consent-API;
 - kein persistentes Nutzerprofil;
 - nur ein verifizierter Händler-Demo-Datensatz;
-- kein abgesicherter Cloud-KI-Gateway auf GitHub Pages;
+- der Vercel-Rate-Limiter ist für eine begrenzte Demo ausgelegt, nicht für eine öffentliche Kampagne;
 - Modell-, Preis- und Verbrauchsdaten müssen regelmäßig aktualisiert werden.
-

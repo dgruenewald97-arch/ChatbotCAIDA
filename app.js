@@ -294,6 +294,7 @@ async function showAISetup() {
     return assistantReply("Diese öffentliche GitHub-Pages-Demo läuft bewusst ohne API-Key im Browser. Die Beratung und alle Widgets funktionieren lokal; für freie Gemini-Antworten starten Sie den Node-Server oder binden später einen sicheren Backend-Proxy an.", { hint: "Kein API-Key im öffentlichen Frontend" });
   }
   if (aiConnection.enabled) return assistantReply(`Gemini ist bereits aktiv. CAIDA beantwortet freie Fragen mit ${aiConnection.model} und behält den sichtbaren Gesprächskontext im Blick.`);
+  if (aiConnection.managed) return assistantReply("Das öffentliche Vercel-Backend ist bereit, aber das Gemini-Secret wurde dort noch nicht hinterlegt. Ein Key wird niemals im Chat oder Browser eingegeben.", { hint: "Serverseitige Vercel-Konfiguration erforderlich" });
   const reason = aiConnection.lastError ? `Die letzte Verbindung scheiterte: ${aiConnection.lastError}` : "Die KI ist noch nicht verbunden.";
   return assistantReply(reason, { html: aiSetupHtml() }, 180);
 }
@@ -814,16 +815,25 @@ async function loadAIStatus() {
   }
   try {
     const response = await fetch("/api/ai-status");
+    if (!response.ok) throw new Error("AI status unavailable");
     const data = await response.json();
     aiConnection = data;
     const providerName = data.provider === "gemini" ? "Gemini" : data.provider === "openai" ? "OpenAI" : "";
-    els.aiStatus.textContent = data.enabled ? `${providerName} aktiv · ${data.model}` : "Demo-Modus · KI verbinden";
-    els.aiStatus.setAttribute("aria-label", data.enabled ? `${providerName} ist aktiv` : "Gemini mit CAIDA verbinden");
+    els.aiStatus.textContent = data.enabled ? `${providerName} aktiv · ${data.model}` : data.managed ? "Vercel-Demo · Gemini fehlt" : "Demo-Modus · KI verbinden";
+    els.aiStatus.setAttribute("aria-label", data.enabled ? `${providerName} ist aktiv` : data.managed ? "Gemini ist serverseitig noch nicht konfiguriert" : "Gemini mit CAIDA verbinden");
     els.privacyText.textContent = data.enabled
       ? `${providerName} aktiv · Fragen werden an ${providerName} übertragen`
-      : "Lokaler Prototyp · keine Übertragung";
+      : data.managed ? "Online-Demo · keine KI-Übertragung" : "Lokaler Prototyp · keine Übertragung";
     const stateLabel = document.querySelector("#ai-config-state");
     if (stateLabel) stateLabel.textContent = data.enabled ? `${providerName} · ${data.model}` : "nicht aktiv";
+    const configForm = document.querySelector("#ai-config-form");
+    const configCopy = document.querySelector("#ai-config-copy");
+    const configMessage = document.querySelector("#ai-config-message");
+    if (data.managed && configForm) {
+      configForm.hidden = true;
+      if (configCopy) configCopy.textContent = "Öffentliche Demo: Der Gemini-Key liegt ausschließlich als verschlüsseltes Vercel-Secret vor und wird nie an den Browser übertragen.";
+      if (configMessage) configMessage.textContent = data.enabled ? "Serverseitige Gemini-Verbindung aktiv." : "Vercel-Backend bereit · Gemini-Secret fehlt noch.";
+    }
     refreshIntroHint();
   } catch {
     aiConnection = { enabled: false, provider: "none", model: null, lastError: "Lokaler KI-Status nicht erreichbar." };
@@ -869,7 +879,7 @@ function setupAIConfig() {
   const key = form.querySelector("#ai-key");
   const keyLabel = form.querySelector("#ai-key-label");
   const providerDefaults = {
-    gemini: { model: "gemini-3.5-flash-lite", label: "Gemini API-Key", placeholder: "AQ… oder AIza…" },
+    gemini: { model: "gemini-2.5-flash-lite", label: "Gemini API-Key", placeholder: "AQ… oder AIza…" },
     openai: { model: "gpt-5-mini", label: "OpenAI API-Key", placeholder: "sk-…" }
   };
   if (STATIC_HOSTED) {
