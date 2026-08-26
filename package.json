@@ -1,0 +1,14 @@
+{
+  "name": "chatbot-caida",
+  "version": "1.0.0",
+  "private": true,
+  "description": "CAIDA Mitsubishi conversational commerce concept prototype",
+  "scripts": {
+    "start": "node server.js",
+    "check": "node --check app.js && node --check server.js"
+  },
+  "engines": {
+    "node": ">=18"
+  }
+}
+
