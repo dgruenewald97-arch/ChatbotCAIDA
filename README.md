@@ -22,7 +22,7 @@ CAIDA ist ein Mobile-First-Konzept für eine Mitsubishi Modellberatung, die voll
 | Modus | Geeignet für | KI | Datenübertragung |
 | --- | --- | --- | --- |
 | GitHub Pages | Teilen, Präsentieren, mobile Tests | lokale Regel- und Widgetlogik | Formulardaten bleiben im Browserzustand |
-| Vercel | Öffentliche Chef-Demo mit freien Fragen | serverseitiges, für den Key verfügbares Gemini Flash-Lite | nur freie Fragen und gekürzter Chatkontext an Gemini |
+| Vercel | Öffentliche Chef-Demo mit freien Fragen | serverseitige Gemini Interactions API mit Flash-Lite | nur freie Fragen und gekürzter Chatkontext an Gemini |
 | Lokaler Node-Server | Entwicklung und Gemini-Demo | optionaler serverseitiger Gemini-/OpenAI-Gateway | nur nach sichtbarer Aktivierung zum gewählten KI-Anbieter |
 
 Auf GitHub Pages wird absichtlich **kein API-Key im Frontend** abgefragt. Die Vercel-Version verwendet dafür Functions und ein serverseitiges `GEMINI_API_KEY`-Secret. Details stehen in [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md).

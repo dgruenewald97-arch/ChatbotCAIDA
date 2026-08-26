@@ -50,7 +50,7 @@ Die Vercel-Version läuft unter derselben Origin wie das Frontend:
 - `api/ai-status.js` meldet ausschließlich Verbindungsstatus und Modellname;
 - `api/ai-chat.js` validiert Origin, Payload und ein weiches IP-Rate-Limit;
 - `api/demo-lead.js` bestätigt nur eine Demo-Referenz und persistiert keine Kontaktdaten;
-- `lib/caida-ai.js` besitzt den serverseitigen Prompt, die geprüfte Modell-Allowlist und harte Kontext-/Antwortgrenzen;
+- `lib/caida-ai.js` besitzt den serverseitigen Prompt, die geprüfte Interactions-Modell-Allowlist und harte Kontext-/Antwortgrenzen;
 - `GEMINI_API_KEY` wird ausschließlich aus Vercel Environment Variables gelesen.
 
 Auf Vercel wird niemals ein API-Key-Formular angeboten. Das Frontend erkennt den Modus über `managed: true` aus `/api/ai-status`.
