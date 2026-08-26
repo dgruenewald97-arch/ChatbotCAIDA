@@ -141,9 +141,11 @@ async function resolveGeminiModel(key, requestedModel = "auto") {
   const available = new Set((result.models || [])
     .filter(model => !model.supportedGenerationMethods || model.supportedGenerationMethods.includes("generateContent"))
     .map(model => String(model.name || "").replace(/^models\//, "")));
-  const candidates = [requestedModel, "gemini-2.5-flash-lite", "gemini-2.5-flash"]
-    .filter(model => model && model !== "auto");
-  const resolved = candidates.find(model => available.has(model));
+  const stableLite = [...available].filter(model => /^gemini-\d+\.\d+-flash-lite$/.test(model)).sort().reverse();
+  const stableFlash = [...available].filter(model => /^gemini-\d+\.\d+-flash$/.test(model)).sort().reverse();
+  const resolved = requestedModel && requestedModel !== "auto" && available.has(requestedModel)
+    ? requestedModel
+    : stableLite[0] || stableFlash[0];
   if (!resolved) throw new Error("Der Key ist gültig, aber kein kompatibles Flash-Lite-Modell ist für dieses Projekt freigeschaltet.");
   return resolved;
 }

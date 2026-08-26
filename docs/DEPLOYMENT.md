@@ -36,7 +36,7 @@ Die Vercel-Version hostet Frontend und Functions unter derselben Domain. Benöti
 
 ```text
 GEMINI_API_KEY       erforderlich, nur als Vercel-Secret
-CAIDA_AI_MODEL       optional: gemini-2.5-flash-lite oder gemini-2.5-flash
+CAIDA_AI_MODEL       optional: exakter, für den Key verfügbarer Modellname
 CAIDA_ALLOWED_ORIGIN optional: zusätzliche exakt erlaubte Origin
 ```
 
@@ -58,7 +58,7 @@ Das Secret gehört weder in `.env`, GitHub noch in das Browserformular. Vercel-E
 
 ### Demo-Kostenbremse
 
-- Standardmodell: `gemini-2.5-flash-lite`;
+- automatische Auswahl des neuesten stabilen Flash-Lite-Modells, das die Google-API für den Key tatsächlich meldet;
 - höchstens sechs vorangehende Chatnachrichten, gekürzt auf je 700 Zeichen;
 - Nutzerfrage höchstens 1.200 Zeichen;
 - Antwort höchstens 260 Output-Tokens;
