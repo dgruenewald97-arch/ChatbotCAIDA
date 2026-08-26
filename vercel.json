@@ -3,8 +3,20 @@
   "functions": {
     "api/ai-chat.js": {
       "maxDuration": 25
+    },
+    "api/training-export.js": {
+      "maxDuration": 60
+    },
+    "api/training-retention.js": {
+      "maxDuration": 60
     }
   },
+  "crons": [
+    {
+      "path": "/api/training-retention",
+      "schedule": "17 3 * * *"
+    }
+  ],
   "headers": [
     {
       "source": "/api/(.*)",

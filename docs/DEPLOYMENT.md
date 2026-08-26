@@ -72,6 +72,16 @@ Der In-Memory-Rate-Limiter ist bewusst nur ein Schutz für die Chef-Demo. Vor ö
 
 `/api/demo-lead` erzeugt lediglich eine nicht persistierte Demo-Referenz. Name und Kontakt werden weder an Mitsubishi noch an einen Händler weitergegeben und nicht serverseitig gespeichert.
 
+## Lernprotokoll auf Vercel
+
+Die Trainingsschleife benötigt einen privaten Vercel Blob Store in einer EU-Region sowie drei serverseitige Variablen:
+
+- `BLOB_READ_WRITE_TOKEN` (wird beim Verknüpfen des Blob Stores erzeugt);
+- `CAIDA_TRAINING_ADMIN_TOKEN` (sensitiver Bearer-Token für den Export);
+- `CRON_SECRET` (sensitiver Token für den täglichen Löschlauf).
+
+Der Browser erhält keinen dieser Werte. Ohne `BLOB_READ_WRITE_TOKEN` meldet `/api/training-status` die Funktion als nicht verfügbar und die Einwilligungs-UI bleibt ausgeblendet. Export, Löschung und Sicherheitsgrenzen sind in `TRAINING-DATA.md` dokumentiert.
+
 ## Produktiver KI-Betrieb jenseits der Demo
 
 Für eine öffentliche KI-Version ist ein separates Backend erforderlich. Mindestanforderungen:

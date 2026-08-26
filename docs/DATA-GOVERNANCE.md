@@ -26,14 +26,15 @@ Diese Daten benötigen im Produkt eine offizielle Händler- oder Bestands-API.
 
 ## Personenbezogene Daten
 
-GitHub Pages hält Formularwerte nur im aktuellen DOM-/JavaScript-Zustand. Der lokale Node-Server speichert Demo-Anfragen nur im Arbeitsspeicher. Es gibt keine Datenbank, Analytics- oder CRM-Übertragung.
+GitHub Pages hält Formularwerte nur im aktuellen DOM-/JavaScript-Zustand. Der lokale Node-Server speichert Demo-Anfragen nur im Arbeitsspeicher. Es gibt keine CRM-Übertragung.
 
-Für Produktion erforderlich:
+Die Vercel-Demo bietet zusätzlich ein standardmäßig deaktiviertes Lernprotokoll. Erst nach separater Zustimmung werden freie Chatnachrichten und Antworten serverseitig redigiert und für höchstens 30 Tage in einem privaten Blob Store in Frankfurt abgelegt. Kontaktfelder aus Probefahrt und Angebot werden nicht protokolliert. Technische Details und Grenzen stehen in `TRAINING-DATA.md`.
+
+Vor einem produktiven Kampagneneinsatz weiterhin erforderlich:
 
 - Einwilligung und Datenschutzhinweise;
 - Zweckbindung und Löschfristen;
 - Transportverschlüsselung;
 - Backendvalidierung und Rate Limits;
-- Protokollierung der Einwilligung;
+- Einbindung in die verbindliche Consent-/Datenschutzerklärung und belastbare Betroffenenprozesse;
 - Rollen- und Berechtigungskonzept.
-

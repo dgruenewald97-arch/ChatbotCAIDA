@@ -50,6 +50,9 @@ Die Vercel-Version läuft unter derselben Origin wie das Frontend:
 - `api/ai-status.js` meldet ausschließlich Verbindungsstatus und Modellname;
 - `api/ai-chat.js` validiert Origin, Payload und ein weiches IP-Rate-Limit;
 - `api/demo-lead.js` bestätigt nur eine Demo-Referenz und persistiert keine Kontaktdaten;
+- `api/training-event.js` speichert nach Einwilligung redigierte Nachrichten im privaten Blob Store;
+- `api/training-export.js` stellt einen Bearer-geschützten JSON-/JSONL-Export bereit;
+- `api/training-retention.js` löscht per täglichem Cron Daten nach 30 Tagen.
 - `lib/caida-ai.js` besitzt den serverseitigen Prompt, die geprüfte Interactions-Modell-Allowlist und harte Kontext-/Antwortgrenzen;
 - `GEMINI_API_KEY` wird ausschließlich aus Vercel Environment Variables gelesen.
 

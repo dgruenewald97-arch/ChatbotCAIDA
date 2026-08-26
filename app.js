@@ -2,6 +2,11 @@
 
 const DATA_STAND = "25.08.2026";
 const STATIC_HOSTED = /(^|\.)github\.io$/i.test(location.hostname) || new URLSearchParams(location.search).has("static");
+const TRAINING_CONSENT_VERSION = "training-v1";
+const TRAINING_CONSENT_KEY = "caida-training-consent-v1";
+const TRAINING_SESSION_KEY = "caida-training-session-v1";
+const TRAINING_DELETE_KEY = "caida-training-delete-v1";
+const TRAINING_SEQUENCE_KEY = "caida-training-sequence-v1";
 
 const MODELS = {
   asx: {
@@ -107,6 +112,7 @@ const els = {
   launcher: document.querySelector(".chat-launcher"),
   aiStatus: document.querySelector("#ai-status"),
   privacyText: document.querySelector("#privacy-note span"),
+  trainingSettings: document.querySelector("#training-settings"),
   contextStrip: document.querySelector("#context-strip"),
   contextTags: document.querySelector("#context-tags"),
   contextClear: document.querySelector("#context-clear")
@@ -117,6 +123,106 @@ let localInbox = [];
 let recognition = null;
 let voiceConsent = null;
 let aiConnection = { enabled: false, provider: "none", model: null, lastError: null };
+let trainingConnection = { available: false, retentionDays: 30, lastWriteOk: null };
+let trainingConsent = readTrainingConsent();
+
+function storageRead(storage, key) {
+  try { return storage.getItem(key); } catch { return null; }
+}
+
+function storageWrite(storage, key, value) {
+  try { storage.setItem(key, value); } catch {}
+}
+
+function readTrainingConsent() {
+  const value = storageRead(localStorage, TRAINING_CONSENT_KEY);
+  return value === "granted" || value === "denied" ? value : "unknown";
+}
+
+function trainingSessionValue(key) {
+  const current = storageRead(sessionStorage, key);
+  if (current) return current;
+  const value = crypto.randomUUID();
+  storageWrite(sessionStorage, key, value);
+  return value;
+}
+
+function nextTrainingSequence() {
+  const next = Math.max(0, Number(storageRead(sessionStorage, TRAINING_SEQUENCE_KEY)) || 0) + 1;
+  storageWrite(sessionStorage, TRAINING_SEQUENCE_KEY, String(next));
+  return next;
+}
+
+function trainingWidget(options = {}) {
+  const html = String(options.html || "");
+  if (!html) return "";
+  if (html.includes("training-card")) return "training-consent";
+  if (html.includes("review-card")) return "review";
+  if (html.includes("lead-form")) return "guided-flow";
+  if (html.includes("source-card")) return "verified-data";
+  if (html.includes("world-card")) return "topic-world";
+  if (html.includes("prompt-rail") || html.includes("choice-grid")) return "quick-replies";
+  return "chat-widget";
+}
+
+function updateTrainingStatus() {
+  if (!els.trainingSettings) return;
+  const active = trainingConnection.available && trainingConsent === "granted";
+  const error = active && trainingConnection.lastWriteOk === false;
+  els.trainingSettings.hidden = !trainingConnection.available;
+  els.trainingSettings.dataset.active = String(active && !error);
+  els.trainingSettings.dataset.error = String(error);
+  els.trainingSettings.textContent = error ? "Training: pausiert" : active ? "Training: aktiv" : "Training: aus";
+  els.trainingSettings.setAttribute("aria-label", error ? "Lernprotokoll derzeit nicht erreichbar" : active ? "Lernprotokoll aktiv; Einstellungen öffnen" : "Lernprotokoll aus; Einstellungen öffnen");
+}
+
+function trainingPayload(data) {
+  return {
+    consent: true,
+    consentVersion: TRAINING_CONSENT_VERSION,
+    sessionId: trainingSessionValue(TRAINING_SESSION_KEY),
+    deletionKey: trainingSessionValue(TRAINING_DELETE_KEY),
+    sequence: nextTrainingSequence(),
+    clientTimestamp: new Date().toISOString(),
+    pageVersion: DATA_STAND,
+    ...data
+  };
+}
+
+async function sendTrainingEvent(data) {
+  if (!trainingConnection.available || trainingConsent !== "granted") return false;
+  try {
+    const response = await fetch("/api/training-event", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(trainingPayload(data)),
+      keepalive: true
+    });
+    if (!response.ok) throw new Error("training storage unavailable");
+    trainingConnection.lastWriteOk = true;
+    updateTrainingStatus();
+    return true;
+  } catch {
+    trainingConnection.lastWriteOk = false;
+    updateTrainingStatus();
+    return false;
+  }
+}
+
+function queueTrainingMessage(role, text, options = {}) {
+  if (options.skipTraining || !text || trainingConsent !== "granted") return;
+  const meta = options.trainingMeta || {};
+  void sendTrainingEvent({
+    type: "message",
+    role,
+    text: String(text).slice(0, 2000),
+    source: meta.source || (role === "user" ? "user" : "local"),
+    model: meta.model || "",
+    flow: state.flow,
+    vehicle: state.recommended || state.answers.interest || "",
+    widget: trainingWidget(options)
+  });
+}
 
 const CONTEXT_LABELS = {
   use: { city: "Stadt & Pendeln", mixed: "Gemischter Alltag", family: "Familie", long: "Langstrecke" },
@@ -209,6 +315,7 @@ function addMessage(role, text, options = {}) {
   els.conversation.appendChild(node);
   bindDynamicActions(node);
   scrollConversation();
+  queueTrainingMessage(role, text, options);
   return node;
 }
 
@@ -247,6 +354,110 @@ function greetingHtml() {
     ["Antrieb verstehen", "Welcher Antrieb passt zu meinem Alltag?"],
     ["Modelle vergleichen", "Vergleiche Grandis und Outlander ehrlich."]
   ]);
+}
+
+function trainingConsentHtml() {
+  const active = trainingConsent === "granted";
+  if (active) {
+    return `<section class="training-card flow-card" data-training-card>
+      <div class="training-card__eyebrow">LERNPROTOKOLL AKTIV</div>
+      <h3>CAIDA darf aus diesem Gespräch besser werden.</h3>
+      <p>Chatnachrichten und Antworten werden serverseitig anonymisiert gespeichert. Formulareingaben werden nicht als Trainingsnachrichten erfasst.</p>
+      <ul><li>Private Ablage in der EU-Region Frankfurt</li><li>Automatische Löschung nach ${trainingConnection.retentionDays} Tagen</li><li>Kein automatisches Live-Training von Gemini</li></ul>
+      <div class="training-card__actions">
+        ${buttonHtml("Aktiv lassen", "focus-input", "", true)}
+        ${buttonHtml("Stoppen & Sitzung löschen", "training-consent", "revoke")}
+      </div>
+      <small>Die Auswahl gilt nur für diesen Browser und kann hier jederzeit geändert werden.</small>
+    </section>`;
+  }
+  return `<section class="training-card flow-card" data-training-card>
+    <div class="training-card__eyebrow">CAIDA VERBESSERN</div>
+    <h3>Darf dieses Gespräch beim Training helfen?</h3>
+    <p>Nur nach Ihrer Zustimmung speichern wir anonymisierte Chatnachrichten und Antworten für Qualitätsprüfung, Prompt-Tests und ein späteres Trainingsdatenset.</p>
+    <ul><li>Keine Kontaktdaten aus Probefahrt- oder Angebotsformularen</li><li>Erkannte E-Mail, Telefon, Name, Adresse und PLZ werden redigiert</li><li>Automatische Löschung nach ${trainingConnection.retentionDays} Tagen</li></ul>
+    <div class="training-card__actions">
+      ${buttonHtml("Training erlauben", "training-consent", "allow", true)}
+      ${buttonHtml("Ohne Speicherung", "training-consent", "deny")}
+    </div>
+    <small>Die Beratung funktioniert in beiden Fällen vollständig.</small>
+  </section>`;
+}
+
+function showTrainingSettings() {
+  if (!trainingConnection.available) return;
+  const existing = els.conversation.querySelector("[data-training-card]:not(.is-complete)");
+  if (existing) {
+    existing.scrollIntoView({ block: "nearest", behavior: "smooth" });
+    return;
+  }
+  return assistantReply(trainingConsent === "granted" ? "Hier können Sie das Lernprotokoll kontrollieren." : "Ihre Entscheidung ist freiwillig und ändert nichts an der Beratung.", { html: trainingConsentHtml(), skipTraining: true }, 120);
+}
+
+async function deleteTrainingSession() {
+  try {
+    const response = await fetch("/api/training-event", {
+      method: "DELETE",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        consentVersion: TRAINING_CONSENT_VERSION,
+        sessionId: trainingSessionValue(TRAINING_SESSION_KEY),
+        deletionKey: trainingSessionValue(TRAINING_DELETE_KEY)
+      })
+    });
+    return response.ok;
+  } catch {
+    return false;
+  }
+}
+
+async function handleTrainingConsent(value) {
+  if (value === "allow") {
+    addMessage("user", "Anonymisiertes Lernprotokoll erlauben", { skipTraining: true });
+    trainingConsent = "granted";
+    storageWrite(localStorage, TRAINING_CONSENT_KEY, trainingConsent);
+    trainingConnection.lastWriteOk = null;
+    updateTrainingStatus();
+    await sendTrainingEvent({ type: "consent" });
+    return assistantReply("Danke. Das Lernprotokoll ist aktiv. Persönliche Kontaktdaten aus den Formularen bleiben außen vor; freie Nachrichten werden zusätzlich serverseitig redigiert.", { hint: `Jederzeit über „Training: aktiv“ änderbar` });
+  }
+  if (value === "deny") {
+    addMessage("user", "Ohne Speicherung fortfahren", { skipTraining: true });
+    trainingConsent = "denied";
+    storageWrite(localStorage, TRAINING_CONSENT_KEY, trainingConsent);
+    trainingConnection.lastWriteOk = null;
+    updateTrainingStatus();
+    return assistantReply("Alles klar. CAIDA berät normal weiter, aber dieses Gespräch wird nicht im Lernprotokoll gespeichert.", { skipTraining: true });
+  }
+  if (value === "revoke") {
+    addMessage("user", "Lernprotokoll beenden und diese Sitzung löschen", { skipTraining: true });
+    trainingConsent = "denied";
+    storageWrite(localStorage, TRAINING_CONSENT_KEY, trainingConsent);
+    trainingConnection.lastWriteOk = null;
+    updateTrainingStatus();
+    const deleted = await deleteTrainingSession();
+    return assistantReply(deleted
+      ? "Das Lernprotokoll ist aus und die gespeicherten Daten dieser Browsersitzung wurden gelöscht."
+      : "Das Lernprotokoll ist aus. Die sofortige Löschung konnte gerade nicht bestätigt werden; spätestens der automatische Löschlauf entfernt die Daten nach 30 Tagen.", { skipTraining: true });
+  }
+}
+
+async function loadTrainingStatus() {
+  if (STATIC_HOSTED) {
+    trainingConnection = { available: false, retentionDays: 30, lastWriteOk: null };
+    updateTrainingStatus();
+    return;
+  }
+  try {
+    const response = await fetch("/api/training-status");
+    if (!response.ok) throw new Error("training status unavailable");
+    const data = await response.json();
+    trainingConnection = { available: Boolean(data.available), retentionDays: Number(data.retentionDays) || 30, lastWriteOk: null };
+  } catch {
+    trainingConnection = { available: false, retentionDays: 30, lastWriteOk: null };
+  }
+  updateTrainingStatus();
+  if (trainingConnection.available && trainingConsent === "unknown") showTrainingSettings();
 }
 
 function introHint() {
@@ -795,7 +1006,7 @@ async function askConnectedAI(question, modelId = state.recommended) {
     if (!data.answer) { typing.remove(); return fallback(); }
     state.aiMessages.push({ role: "user", content: question }, { role: "assistant", content: data.answer });
     typing.remove();
-    return addMessage("assistant", data.answer, { html: nextPromptHtml(question, modelId), hint: `Gemini · ${data.model} · geprüfter Mitsubishi-Kontext` });
+    return addMessage("assistant", data.answer, { html: nextPromptHtml(question, modelId), hint: `Gemini · ${data.model} · geprüfter Mitsubishi-Kontext`, trainingMeta: { source: "gemini", model: data.model } });
   } catch (error) {
     typing.remove();
     return fallback();
@@ -1152,6 +1363,7 @@ function bindDynamicActions(root) {
         actionSurface.querySelectorAll("button").forEach(item => { item.disabled = true; });
       }
       if (action === "dealer-pick") return pickDealer(value);
+      if (action === "training-consent") return handleTrainingConsent(value);
       if (action === "trial-dealer") return selectTrialDealer(value);
       if (action === "trial-slot") return selectTrialSlot(value);
       if (action === "confirm-trial") return confirmTrial();
@@ -1331,6 +1543,7 @@ document.querySelectorAll("[data-chat-prompt]").forEach(button => button.addEven
 document.querySelectorAll("[data-close-chat]").forEach(button => button.addEventListener("click", closeChat));
 document.querySelectorAll("[data-focus-input]").forEach(button => button.addEventListener("click", () => openChat()));
 els.aiStatus.addEventListener("click", showAISetup);
+els.trainingSettings.addEventListener("click", showTrainingSettings);
 els.contextClear.addEventListener("click", () => {
   state.answers = {};
   state.recommended = null;
@@ -1350,4 +1563,5 @@ setupVoice();
 setupAIConfig();
 loadAIStatus();
 resetConversation();
+loadTrainingStatus();
 setTimeout(() => els.shell.classList.remove("is-entering"), 700);

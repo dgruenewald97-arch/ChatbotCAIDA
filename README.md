@@ -16,13 +16,14 @@ CAIDA ist ein Mobile-First-Konzept für eine Mitsubishi Modellberatung, die voll
 - Angebotsprofil: Modell → Kauf/Finanzierung/Leasing → Priorität → Partner → Prüfung;
 - lokale Demo-Inbox ohne externe Übermittlung;
 - Spracheingabe, sofern der Browser sie unterstützt und der Nutzer zustimmt.
+- optionales, einwilligungsbasiertes Lernprotokoll mit serverseitiger Redaktion und 30-Tage-Löschung.
 
 ## Zwei bewusst getrennte Betriebsarten
 
 | Modus | Geeignet für | KI | Datenübertragung |
 | --- | --- | --- | --- |
 | GitHub Pages | Teilen, Präsentieren, mobile Tests | lokale Regel- und Widgetlogik | Formulardaten bleiben im Browserzustand |
-| Vercel | Öffentliche Chef-Demo mit freien Fragen | serverseitige Gemini Interactions API mit Flash-Lite | nur freie Fragen und gekürzter Chatkontext an Gemini |
+| Vercel | Öffentliche Chef-Demo mit freien Fragen | serverseitige Gemini Interactions API mit Flash-Lite | Fragen an Gemini; Lernprotokoll nur nach separater Zustimmung |
 | Lokaler Node-Server | Entwicklung und Gemini-Demo | optionaler serverseitiger Gemini-/OpenAI-Gateway | nur nach sichtbarer Aktivierung zum gewählten KI-Anbieter |
 
 Auf GitHub Pages wird absichtlich **kein API-Key im Frontend** abgefragt. Die Vercel-Version verwendet dafür Functions und ein serverseitiges `GEMINI_API_KEY`-Secret. Details stehen in [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md).
@@ -51,6 +52,7 @@ flowchart LR
   G --> C
   W --> C
   W --> D[Lokale Demo-Inbox]
+  C -->|nur nach Einwilligung| T[Redaktion + privates Lernprotokoll]
 ```
 
 Die transaktionalen Wege laufen immer vor der freien KI. Dadurch kann ein Modell weder Händler erfinden noch behaupten, eine Probefahrt sei gebucht worden.
@@ -71,6 +73,7 @@ Die transaktionalen Wege laufen immer vor der freien KI. Dadurch kann ein Modell
 │   ├── ARCHITECTURE.md        Zustände, Routing und technische Grenzen
 │   ├── CONVERSATION-DESIGN.md Sprache, Flow-Verträge und UX-Regeln
 │   ├── FINETUNING.md          Konkreter Leitfaden zum Weiterentwickeln
+│   ├── TRAINING-DATA.md       Einwilligung, Schema, Export und Löschung
 │   ├── DATA-GOVERNANCE.md     Faktenbasis und Aktualisierung
 │   └── DEPLOYMENT.md          Pages, lokal und Vercel-Backend
 ├── QUELLEN.md                 Aktuelle Datenquellen
@@ -80,6 +83,8 @@ Die transaktionalen Wege laufen immer vor der freien KI. Dadurch kann ein Modell
 ## Weiterentwickeln
 
 Der schnellste Einstieg ist [docs/FINETUNING.md](docs/FINETUNING.md). Dort steht, an welchen Stellen Intents, Daten, Gesprächston, Widgets und QA erweitert werden.
+
+Einwilligungsbasiert gespeicherte Gespräche lassen sich für die Auswertung mit `npm run training:export` als lokales JSONL exportieren. Einrichtung, Datenschutzgrenzen und Datenschema stehen in [docs/TRAINING-DATA.md](docs/TRAINING-DATA.md).
 
 Vor einem Commit:
 
@@ -92,7 +97,7 @@ Danach die relevanten Dialoge sowohl auf Desktop als auch bei ungefähr `390 × 
 ## Noch nicht produktiv
 
 - keine Live-Bestände oder echten Terminslots;
-- keine Händler-/CRM- oder Consent-API;
+- keine Händler-/CRM-API; das Lernprotokoll hat eine Demo-Einwilligung, aber noch keinen produktiven CMP-/Rechtsprozess;
 - kein persistentes Nutzerprofil;
 - nur ein verifizierter Händler-Demo-Datensatz;
 - der Vercel-Rate-Limiter ist für eine begrenzte Demo ausgelegt, nicht für eine öffentliche Kampagne;
