@@ -7,6 +7,7 @@ const TRAINING_CONSENT_KEY = "caida-training-consent-v1";
 const TRAINING_SESSION_KEY = "caida-training-session-v1";
 const TRAINING_DELETE_KEY = "caida-training-delete-v1";
 const TRAINING_SEQUENCE_KEY = "caida-training-sequence-v1";
+const { accessoryLabel, extractModelYear, hasAccessoryIntent, hasDealerIntent, hasNegatedTrialIntent } = window.CAIDA_DIALOG;
 
 const MODELS = {
   asx: {
@@ -236,6 +237,8 @@ function freshState() {
   return {
     flow: "start", answers: {}, asked: [], compare: [], recommended: null,
     alternative: null, lastQuestion: null, aiMessages: [],
+    dealerPurpose: "general",
+    service: { topic: null, query: null, model: null, modelYear: null },
     transaction: { kind: null, model: null, postcode: null, dealer: null, time: null, offerType: null, preference: null, name: null, contact: null }
   };
 }
@@ -572,9 +575,25 @@ async function handleUserText(raw) {
   mergeParsed(parsed);
 
   if (/neu starten|zurücksetzen|reset/.test(lower)) return resetConversation();
+  if (hasNegatedTrialIntent(lower) && (state.transaction.kind === "trial" || state.flow === "trial-select")) return cancelTrialFlow();
+  if (hasAccessoryIntent(lower)) return startAccessoryRequest(text, parsed.models[0]);
+  if (/^\s*(?:nein|abbrechen|stop(?:pen)?|doch nicht)\b/.test(lower) && state.flow === "transaction") {
+    if (state.transaction.kind === "trial") return cancelTrialFlow();
+    state.flow = "start";
+    state.transaction.kind = null;
+    return assistantReply("Verstanden – der laufende Vorgang ist beendet. Es wurde nichts übermittelt. Sie können ganz normal mit einem anderen Thema weitermachen.");
+  }
+  if (/^accessories/.test(state.flow)) {
+    const year = extractModelYear(text);
+    if (year) return continueAccessoryRequest(text);
+    if (hasDealerIntent(lower)) {
+      const postcode = text.match(/\b\d{5}\b/)?.[0] || state.transaction.postcode || "";
+      return showDealers(postcode, "accessories");
+    }
+  }
   if (state.flow === "dealer") {
     const postcode = text.match(/\b\d{5}\b/)?.[0];
-    if (postcode) return showDealers(postcode);
+    if (postcode) return showDealers(postcode, state.dealerPurpose);
     return assistantReply("Ich brauche nur die fünfstellige Postleitzahl – zum Beispiel 61169.");
   }
   if (state.flow === "trial-select") {
@@ -590,7 +609,7 @@ async function handleUserText(raw) {
   if (competitorMention && /besser|vergleich|vergleichen|unterschied|welcher|welches/.test(lower)) {
     return answerCompetitorSafely(text, parsed.models[0] || state.recommended || state.answers.interest);
   }
-  if (hasTrialIntent(lower)) {
+  if (hasTrialIntent(lower) && !hasNegatedTrialIntent(lower)) {
     const modelId = parsed.models[0] || state.recommended || state.answers.interest;
     if (modelId && MODELS[modelId]) return openTrial(modelId);
     state.flow = "trial-select";
@@ -602,9 +621,9 @@ async function handleUserText(raw) {
   }
   if (/händler|autohaus|mitsubishi.partner|partner (finden|suchen)/.test(lower)) {
     const postcode = text.match(/\b\d{5}\b/)?.[0] || "";
-    return showDealers(postcode);
+    return showDealers(postcode, state.service.topic === "accessories" ? "accessories" : "general");
   }
-  if (/service|wartung|garantie|panne|coc|ersatzteil|zubehör|werkstatt/.test(lower)) return startService(text);
+  if (/service|wartung|garantie|panne|coc|werkstatt/.test(lower)) return startService(text);
   if ((/vergleich|vergleichen|unterschied/.test(lower) && !competitorMention) || parsed.models.length >= 2) {
     state.flow = "compare";
     state.compare = [...new Set([...state.compare, ...parsed.models])];
@@ -697,6 +716,8 @@ async function handleAction(action, value, source) {
     updateHero(value);
     return assistantReply(`Alles klar – ${MODELS[value].name}. Was möchten Sie wissen? Sie können ganz normal fragen.`, { html: choicesHtml([["Passt er zu meinem Alltag?", `Passt der ${MODELS[value].name} zu meinem Alltag?`], ["Preis & Antrieb", `Was kosten und können die Antriebe des ${MODELS[value].name}?`], ["Mit anderem Modell vergleichen", "" ]], "context-sample") });
   }
+  if (action === "accessory-model") return selectAccessoryModel(value);
+  if (action === "accessory-dealer-search") return showDealers(value || state.transaction.postcode || "", "accessories");
   if (action === "trial-model") return openTrial(value);
   if (action === "offer-model") return openOffer(value);
   if (action === "compare-model") {
@@ -714,7 +735,7 @@ async function handleAction(action, value, source) {
   if (action === "show-alternative") return renderRecommendation(state.alternative, state.recommended, false);
   if (action === "source") return assistantReply("Hier bleiben wir im Gespräch. Das sind die Daten aus der geprüften Mitsubishi-Quelle:", { html: sourceCardHtml(value) });
   if (action === "service-topic") return serviceTopic(value, source.textContent.trim());
-  if (action === "dealer-search") return showDealers(value);
+  if (action === "dealer-search") return showDealers(value, state.service.topic === "accessories" ? "accessories" : "general");
 }
 
 async function askNextQuestion(withAcknowledgement = false) {
@@ -945,13 +966,89 @@ async function startService(original = "") {
   return assistantReply("Gern. Ich bleibe bei offiziellen Informationen und führe Sie bei fahrzeugbezogenen Problemen direkt zum passenden Mitsubishi-Weg.", { html: choicesHtml(topics, "service-topic") });
 }
 
+function accessoryRequestHtml() {
+  const request = state.service;
+  const model = MODELS[request.model];
+  const dealer = state.transaction.dealer;
+  return `<section class="source-card accessory-card" aria-label="Zubehör- und Teileanfrage">
+    <div><span>ZUBEHÖR &amp; TEILE · KONTROLLIERTER FLOW</span><h3>${escapeHtml(request.query || "Zubehör / Teil")}</h3><p>${model ? model.name : "Modell noch offen"}</p></div>
+    <dl>
+      <div><dt>Fahrzeug</dt><dd>${model ? model.name : "Bitte Modell wählen"}</dd></div>
+      <div><dt>Modelljahr</dt><dd>${escapeHtml(request.modelYear || "noch angeben")}</dd></div>
+      <div><dt>Partner</dt><dd>${escapeHtml(dealer || "noch auswählen")}</dd></div>
+      <div><dt>Status</dt><dd>Teilenummer, Preis und Bestand ungeprüft</dd></div>
+    </dl>
+    <div class="quick-actions">
+      ${buttonHtml(dealer ? "Anderen Händler wählen" : "Händler finden", "accessory-dealer-search", "", true)}
+      ${buttonHtml(request.modelYear ? "Modelljahr ändern" : "Modelljahr schreiben", "focus-input")}
+    </div>
+    <small>Eine verbindliche Zuordnung sollte der Partner anhand von Modelljahr und später gegebenenfalls der VIN außerhalb des freien KI-Dialogs prüfen.</small>
+  </section>`;
+}
+
+async function startAccessoryRequest(original = "", modelId = null) {
+  const detectedModel = modelId || state.service.model || state.recommended || state.answers.interest;
+  const year = extractModelYear(original);
+  state.service = {
+    topic: "accessories",
+    query: hasAccessoryIntent(original) ? accessoryLabel(original) : state.service.query || "Zubehör / Teil",
+    model: detectedModel && MODELS[detectedModel] ? detectedModel : null,
+    modelYear: year || state.service.modelYear || null
+  };
+  state.flow = state.service.model ? "accessories" : "accessories-model";
+
+  if (!state.service.model) {
+    return assistantReply("Für welches Mitsubishi Modell suchen Sie das Teil? Danach halte ich Zubehörwunsch, Modell und Händler als einen zusammenhängenden Vorgang fest.", { html: modelChoiceHtml("accessory-model") });
+  }
+  state.answers.interest = state.service.model;
+  updateHero(state.service.model);
+  if (hasDealerIntent(original)) {
+    const postcode = original.match(/\b\d{5}\b/)?.[0] || state.transaction.postcode || "";
+    return showDealers(postcode, "accessories");
+  }
+
+  const model = MODELS[state.service.model];
+  const yearNote = state.service.modelYear
+    ? `Das Modelljahr ${state.service.modelYear} ist notiert.`
+    : "Als Nächstes hilft das Modelljahr beziehungsweise die Erstzulassung.";
+  return assistantReply(`Zu „${state.service.query}“ am ${model.name} erfinde ich weder Teilenummer noch Verfügbarkeit. ${yearNote} Danach kann der ausgewählte Mitsubishi-Partner die exakte Zuordnung und den Bestand prüfen.`, { html: accessoryRequestHtml() });
+}
+
+async function selectAccessoryModel(modelId) {
+  addMessage("user", MODELS[modelId].name);
+  state.service.model = modelId;
+  state.answers.interest = modelId;
+  return startAccessoryRequest(state.service.query || "Zubehör", modelId);
+}
+
+async function continueAccessoryRequest(text) {
+  const year = extractModelYear(text);
+  if (year) state.service.modelYear = year;
+  state.flow = "accessories";
+  const dealer = state.transaction.dealer;
+  const message = dealer
+    ? `${year ? `Modelljahr ${year} ist ergänzt.` : "Der Zubehörwunsch bleibt vorgemerkt."} ${dealer} kann jetzt Teilenummer, Preis und Verfügbarkeit verbindlich prüfen; im Prototyp behaupte ich dazu keinen Live-Bestand.`
+    : `${year ? `Modelljahr ${year} ist ergänzt.` : "Der Zubehörwunsch bleibt vorgemerkt."} Jetzt fehlt nur noch der gewünschte Mitsubishi-Partner.`;
+  return assistantReply(message, { html: accessoryRequestHtml() });
+}
+
+async function cancelTrialFlow() {
+  const { postcode, dealer } = state.transaction;
+  state.transaction = { kind: null, model: state.service.model || state.answers.interest || null, postcode, dealer, time: null, offerType: null, preference: null, name: null, contact: null };
+  state.flow = state.service.topic === "accessories" ? "accessories" : "start";
+  const context = dealer ? ` ${dealer} bleibt lediglich als ausgewählter Ansprechpartner erhalten.` : "";
+  return assistantReply(`Verstanden – die Probefahrt ist beendet. Es wurde nichts übermittelt.${context}`, {
+    html: state.service.topic === "accessories" ? accessoryRequestHtml() : promptRailHtml([["Normal weiterfragen", "Ich möchte etwas anderes wissen."], ["Zubehör & Teile", "Ich suche Zubehör oder Ersatzteile."]])
+  });
+}
+
 async function serviceTopic(topic, label) {
   addMessage("user", label);
+  if (topic === "accessories") return startAccessoryRequest(label, state.answers.interest || state.recommended);
   const content = {
     maintenance: ["Für Wartung und Reparatur ist der Mitsubishi-Partner der richtige Weg. CAIDA kann im Produkt Fahrzeug, Kilometerstand und Wunschtermin aufnehmen und die Übergabe vorbereiten.", "https://www.mitsubishi-motors.de/service-garantien/service"],
     warranty: ["Mitsubishi veröffentlicht die geltenden Garantieinformationen zentral. Für eine verbindliche Prüfung braucht der Partner Fahrzeugdaten und Erstzulassung – CAIDA würde diese getrennt vom KI-Dialog erfassen.", "https://www.mitsubishi-motors.de/service-garantien/garantien"],
     breakdown: ["Bei einer akuten Panne sollte CAIDA nicht diagnostizieren. Sie führt unmittelbar zur Mitsubishi Assistance beziehungsweise zum zuständigen Partner.", "https://www.mitsubishi-motors.de/service-garantien/service"],
-    accessories: ["Originalzubehör und Verfügbarkeit hängen vom Modell und teilweise vom Modelljahr ab. CAIDA kann das Fahrzeug einordnen und anschließend nur passende offizielle Angebote zeigen.", "https://www.mitsubishi-motors.de/zubehoer"],
     documents: ["Bei CoC- oder Zulassungsdokumenten führt CAIDA in einen strukturierten Kontaktweg. Sie erfindet keine Aussage zu Gebühren oder Bearbeitungszeit.", "https://www.mitsubishi-motors.de/kontakt"]
   }[topic];
   return assistantReply(content[0], { html: `<div class="quick-actions">${buttonHtml("Händler finden", "dealer-search", "", true)}${buttonHtml("Eigene Frage", "focus-input")}</div>` });
@@ -1245,22 +1342,40 @@ function dealerSearchHtml() {
   return `<form class="lead-form flow-card" data-dealer-search-form><div class="flow-kicker">HÄNDLERSUCHE IM CHAT</div><h3>Welche Region?</h3><p>CAIDA zeigt nur verifizierte Partnerdaten und erfindet keine Standorte.</p><div class="field-grid field-grid--single"><div class="field"><label for="dealer-postcode">Postleitzahl</label><input id="dealer-postcode" name="postcode" inputmode="numeric" pattern="[0-9]{5}" maxlength="5" placeholder="z. B. 61169" required></div></div><button class="button button--primary" type="submit">Verifizierte Partner anzeigen</button></form>`;
 }
 
-function dealerHtml(postcode, dealers) {
+function dealerHtml(postcode, dealers, purpose = "general") {
   if (!dealers) return `<section class="lead-form flow-card"><div class="flow-kicker">HÄNDLERSUCHE</div><h3>Für ${escapeHtml(postcode)} fehlen verifizierte Demodaten</h3><p>CAIDA zeigt deshalb keine erfundenen Namen. Im klickbaren Prototyp ist 61169 hinterlegt.</p><div class="quick-actions">${buttonHtml("Demo-PLZ 61169", "dealer-search", "61169", true)}${buttonHtml("Andere PLZ", "dealer-search", "")}</div></section>`;
-  return dealerChoicesHtml(postcode, dealers, "dealer-pick", 1, ["Partner auswählen"]);
+  const action = purpose === "accessories" ? "accessory-dealer" : "dealer-pick";
+  const labels = purpose === "accessories" ? ["Teile-Partner"] : ["Partner auswählen"];
+  return dealerChoicesHtml(postcode, dealers, action, 1, labels);
 }
 
-async function showDealers(postcode = "") {
+async function showDealers(postcode = "", purpose = "general") {
   state.flow = "dealer";
-  if (!postcode) return assistantReply("Ich starte die kontrollierte Händlersuche. Dafür brauche ich nur die Postleitzahl.", { html: dealerSearchHtml() });
+  state.dealerPurpose = purpose;
+  if (!postcode) {
+    const reason = purpose === "accessories" && state.service.model
+      ? `Für „${state.service.query || "das gesuchte Teil"}“ am ${MODELS[state.service.model].name} brauche ich nur die Postleitzahl. Danach zeige ich ausschließlich verifizierte Demo-Partner.`
+      : "Ich starte die kontrollierte Händlersuche. Dafür brauche ich nur die Postleitzahl.";
+    return assistantReply(reason, { html: dealerSearchHtml() });
+  }
   state.transaction.postcode = postcode;
-  return assistantReply("", { html: dealerHtml(postcode, VERIFIED_DEALERS[postcode]) }, 180);
+  return assistantReply("", { html: dealerHtml(postcode, VERIFIED_DEALERS[postcode], purpose) }, 180);
 }
 
 async function submitDealerSearch(form) {
   const postcode = String(new FormData(form).get("postcode") || "");
   addMessage("user", `PLZ ${postcode}`);
-  return showDealers(postcode);
+  return showDealers(postcode, state.dealerPurpose);
+}
+
+async function selectAccessoryDealer(name) {
+  state.flow = "accessories";
+  state.dealerPurpose = "accessories";
+  state.transaction.dealer = name;
+  addMessage("user", name);
+  const model = MODELS[state.service.model];
+  const yearNote = state.service.modelYear ? ` Modelljahr ${state.service.modelYear} ist notiert.` : " Das Modelljahr fehlt noch.";
+  return assistantReply(`${name} ist als Ansprechpartner für „${state.service.query || "das gesuchte Teil"}“ am ${model?.name || "Mitsubishi"} vorgemerkt.${yearNote} Preis, Teilenummer und Bestand kann nur der Partner verbindlich bestätigen – CAIDA behauptet keine Anfrage oder Übermittlung.`, { html: accessoryRequestHtml() });
 }
 
 async function pickDealer(name) {
@@ -1363,6 +1478,7 @@ function bindDynamicActions(root) {
         actionSurface.querySelectorAll("button").forEach(item => { item.disabled = true; });
       }
       if (action === "dealer-pick") return pickDealer(value);
+      if (action === "accessory-dealer") return selectAccessoryDealer(value);
       if (action === "training-consent") return handleTrainingConsent(value);
       if (action === "trial-dealer") return selectTrialDealer(value);
       if (action === "trial-slot") return selectTrialSlot(value);
