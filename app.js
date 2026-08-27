@@ -1,6 +1,6 @@
 "use strict";
 
-const DATA_STAND = "25.08.2026";
+const { COMMON_OFFER_TERMS, DATA_STAND, MODELS: VERIFIED_MODELS } = window.CAIDA_FACTS;
 const STATIC_HOSTED = /(^|\.)github\.io$/i.test(location.hostname) || new URLSearchParams(location.search).has("static");
 const TRAINING_CONSENT_VERSION = "training-v1";
 const TRAINING_CONSENT_KEY = "caida-training-consent-v1";
@@ -10,52 +10,40 @@ const TRAINING_SEQUENCE_KEY = "caida-training-sequence-v1";
 const {
   accessoryLabel,
   extractModelYear,
+  hasAdvisoryIntent,
+  hasAmbiguousAsxAlias,
   hasAccessoryIntent,
   hasDealerIntent,
   hasModelLocationIntent,
   hasNegatedTrialIntent,
   hasOfferLeadIntent,
-  hasPromotionIntent
+  hasPromotionIntent,
+  isBareCancellation
 } = window.CAIDA_DIALOG;
 
 const MODELS = {
   asx: {
-    id: "asx", name: "ASX", label: "Kompakter SUV", image: "assets/asx.webp",
-    price: "22.390 €", drive: "Benzin, Mildhybrid oder Hybrid",
-    efficiency: "Hybrid: 4,3–4,4 l/100 km", co2: "CO₂-Klasse C (Hybrid)",
-    source: "https://www.mitsubishi-motors.de/asx",
+    ...VERIFIED_MODELS.asx, image: "assets/asx.webp",
     reasons: ["Kompakte Abmessungen für Stadt und Alltag", "Drei unterschiedliche Antriebsoptionen", "Günstigster Einstieg der regulär verfügbaren SUV-Modelle"],
-    tradeoff: "Wenn regelmäßig viel Gepäck oder fünf Personen mitfahren, bietet der Grandis mehr Reserven."
+    tradeoff: "Wenn regelmäßig fünf Personen und viel Gepäck mitfahren, sollte der Platzbedarf konkret gegen den Grandis geprüft werden."
   },
   grandis: {
-    id: "grandis", name: "GRANDIS", label: "Familien-SUV", image: "assets/grandis.webp",
-    price: "26.390 €", drive: "Mildhybrid oder Hybrid",
-    efficiency: "Hybrid: 4,3–4,4 l/100 km", co2: "CO₂-Klasse C (Hybrid)",
-    source: "https://www.mitsubishi-motors.de/grandis",
+    ...VERIFIED_MODELS.grandis, image: "assets/grandis.webp",
     reasons: ["Auf einen aktiven Familienalltag ausgerichtet", "Effizienter Hybrid ohne Ladeplanung", "Mehr Raum, ohne direkt in die große SUV-Klasse zu wechseln"],
     tradeoff: "Wer regelmäßig elektrisch fahren, extern laden und Allrad nutzen möchte, sollte den Outlander mitprüfen."
   },
   eclipse: {
-    id: "eclipse", name: "ECLIPSE CROSS", label: "Elektro-SUV", image: "assets/eclipse-cross.webp",
-    price: "43.990 €", drive: "Vollelektrisch",
-    efficiency: "16,7–17,1 kWh/100 km", co2: "CO₂-Klasse A",
-    source: "https://www.mitsubishi-motors.de/eclipse-cross",
+    ...VERIFIED_MODELS.eclipse, image: "assets/eclipse-cross.webp",
     reasons: ["Vollelektrischer Antrieb ohne lokale CO₂-Emissionen", "Mit 87-kWh-Batterie bis zu 627 km WLTP-Reichweite", "Für Alltag und längere Strecken konzipiert"],
     tradeoff: "Der größte Vorteil entsteht, wenn regelmäßiges Laden zuhause, bei der Arbeit oder zuverlässig öffentlich möglich ist."
   },
   outlander: {
-    id: "outlander", name: "OUTLANDER", label: "Plug-in-Hybrid SUV", image: "assets/outlander-diamant.webp",
-    price: "39.990 €", drive: "Plug-in Hybrid · 4WD",
-    efficiency: "16–19,1 kWh + 2,6–2,7 l/100 km", co2: "CO₂-Klasse B gewichtet",
-    source: "https://www.mitsubishi-motors.de/outlander-plug-in-hybrid",
+    ...VERIFIED_MODELS.outlander, image: "assets/outlander-diamant.webp",
     reasons: ["Elektrisches Fahren im Alltag plus Langstrecken-Flexibilität", "Super All Wheel Control und 4WD", "225 kW Systemleistung in der Diamant-Variante"],
     tradeoff: "Ein Plug-in Hybrid ist besonders sinnvoll, wenn die Batterie im Alltag konsequent geladen wird."
   },
   colt: {
-    id: "colt", name: "COLT", label: "Kleinwagen · Auslaufmodell", image: "assets/asx.webp",
-    price: "19.690 €*", drive: "Benzin oder Hybrid",
-    efficiency: "Hybrid: 4,2–4,3 l/100 km", co2: "CO₂-Klasse C (Hybrid)",
-    source: "https://www.mitsubishi-motors.de/colt",
+    ...VERIFIED_MODELS.colt, image: "assets/asx.webp",
     reasons: ["Kompaktes Format", "Effiziente Hybrid-Variante", "Tages- und Kurzzulassungen können noch verfügbar sein"],
     tradeoff: "Der COLT ist als regulär konfigurierbarer Neuwagen nicht mehr verfügbar. CAIDA empfiehlt deshalb den Händlerkontakt für Restbestände."
   }
@@ -321,6 +309,12 @@ function createBubble(text) {
   return bubble;
 }
 
+function rememberAIMessage(role, text, options = {}) {
+  if (options.skipAIContext || !text || !["user", "assistant"].includes(role)) return;
+  state.aiMessages.push({ role, content: String(text).trim().slice(0, 1200) });
+  if (state.aiMessages.length > 24) state.aiMessages.splice(0, state.aiMessages.length - 24);
+}
+
 function addMessage(role, text, options = {}) {
   const node = els.template.content.firstElementChild.cloneNode(true);
   node.classList.toggle("message--user", role === "user");
@@ -336,6 +330,7 @@ function addMessage(role, text, options = {}) {
     body.appendChild(hint);
   }
   els.conversation.appendChild(node);
+  rememberAIMessage(role, text, options);
   bindDynamicActions(node);
   scrollConversation();
   queueTrainingMessage(role, text, options);
@@ -593,17 +588,28 @@ function mergeParsed(parsed) {
   updateContextStrip();
 }
 
+function promotionOverviewHtml() {
+  const promoted = ["asx", "grandis", "eclipse", "outlander"].map(id => MODELS[id]);
+  return `<section class="source-card promotion-card" aria-label="Geprüfte Mitsubishi Aktionspreise">
+    <div><span>OFFIZIELLER WEBSEITEN-SNAPSHOT · ${DATA_STAND}</span><h3>Aktuelle Aktionspreise</h3><p>Mitsubishi Motors Deutschland</p></div>
+    <dl>${promoted.map(model => `<div><dt>${model.name}</dt><dd>ab ${model.price} · ${model.promotion.discount} Aktionsrabatt</dd></div>`).join("")}</dl>
+    <small>${COMMON_OFFER_TERMS}</small>
+  </section>`;
+}
+
 function answerPromotionQuestion(parsed) {
   state.flow = "start";
   state.transaction.kind = null;
   const modelId = parsed.models[0] || state.answers.interest || state.recommended;
   const model = modelId && MODELS[modelId];
-  const subject = model ? `für den ${model.name}` : "für die Mitsubishi Modelle";
-  return assistantReply(`Sie fragen nach einer aktuell laufenden Sonder- oder Preisaktion ${subject} – nicht nach einem persönlichen Händlerangebot. Dazu enthält diese Demo keinen live verifizierten Aktionsfeed. Belegt ist${model ? ` beim ${model.name} der Einstieg ab ${model.price}` : " nur die angezeigte Preisbasis"}; ob darüber hinaus gerade ein Bonus oder Rabatt gilt, behaupte ich deshalb nicht.`, {
+  const response = model?.promotion
+    ? `Ja. Für den ${model.name} weist Mitsubishi aktuell einen unverbindlich empfohlenen Aktionspreis ab ${model.price} aus. Grundlage sind ${model.promotion.listPrice} Fahrzeugpreis minus ${model.promotion.discount} Aktionsrabatt für den ${model.promotion.variant}. Die Aktion gilt ab Importlager und solange der Vorrat reicht; Überführung und bestimmte Lackierungen kommen hinzu.`
+    : "Ja. Die offiziellen deutschen Modellseiten weisen aktuell Aktionspreise für ASX, GRANDIS, ECLIPSE CROSS und OUTLANDER aus. Ich zeige Ihnen den am 27.08.2026 geprüften Stand direkt hier im Chat.";
+  return assistantReply(response, {
     html: model
       ? `${sourceCardHtml(model.id)}${promptRailHtml([["Persönliches Angebot vorbereiten", `Ich möchte ein persönliches Angebot für den ${model.name} vorbereiten.`], ["Modell einordnen", `Passt der ${model.name} zu meinem Alltag?`]])}`
-      : promptRailHtml([["Modelle & Preise", "Was sind die geprüften Preise der Mitsubishi Modelle?"], ["Persönliches Angebot", "Ich möchte ein persönliches Angebot vorbereiten."]]),
-    hint: "Aktionsstatus nicht live geprüft"
+      : `${promotionOverviewHtml()}${promptRailHtml([["Modelle vergleichen", "Vergleiche die Mitsubishi Aktionspreise und Antriebe."], ["Persönliches Angebot", "Ich möchte ein persönliches Angebot vorbereiten."]])}`,
+    hint: `Offizielle Mitsubishi-Webseiten · geprüft am ${DATA_STAND}`
   });
 }
 
@@ -620,9 +626,25 @@ async function handleUserText(raw) {
 
   if (/neu starten|zurücksetzen|reset/.test(lower)) return resetConversation();
   if (hasNegatedTrialIntent(lower) && (state.transaction.kind === "trial" || state.flow === "trial-select")) return cancelTrialFlow();
+  if (hasAmbiguousAsxAlias(lower)) {
+    const previous = MODELS[state.answers.interest || state.recommended];
+    const options = [["ASX", "Warum sollte ich einen ASX kaufen?"]];
+    if (previous && previous.id !== "asx") options.push([previous.name, `Warum sollte ich einen ${previous.name} kaufen?`]);
+    return assistantReply(`„Sex“ könnte eine Sprach- oder Tippfehlerkennung für ASX sein. Meinten Sie den ASX${previous ? ` – oder weiterhin den ${previous.name}` : ""}?`, { html: choicesHtml(options, "context-sample") });
+  }
   if (hasAccessoryIntent(lower)) return startAccessoryRequest(text, parsed.models[0]);
   if (hasPromotionIntent(lower)) return answerPromotionQuestion(parsed);
-  if (/^\s*(?:nein|abbrechen|stop(?:pen)?|doch nicht)\b/.test(lower) && state.flow === "transaction") {
+  if (hasAdvisoryIntent(lower)) {
+    const modelId = parsed.models[0] || state.answers.interest || state.recommended;
+    if (state.flow === "transaction") {
+      state.flow = "start";
+      state.transaction.kind = null;
+    }
+    return aiConnection.enabled
+      ? askConnectedAI(text, modelId)
+      : modelId && MODELS[modelId] ? answerVerifiedModelQuestion(text, modelId) : answerLocallyWithoutAI(text);
+  }
+  if (isBareCancellation(lower) && state.flow === "transaction") {
     if (state.transaction.kind === "trial") return cancelTrialFlow();
     state.flow = "start";
     state.transaction.kind = null;
@@ -835,6 +857,13 @@ function answerLocallyWithoutAI(text) {
 function answerVerifiedModelQuestion(text, id) {
   const m = MODELS[id];
   const lower = text.toLowerCase();
+  if (hasAdvisoryIntent(lower)) {
+    const reasons = (m.verifiedFacts || []).slice(0, 3).join("; ");
+    return assistantReply(`Für den ${m.name} sprechen aus der aktuell belegten Datenbasis vor allem diese Punkte: ${reasons}. Der ehrliche Gegencheck: ${m.tradeoff} Ob das für Sie ein Kaufgrund ist, hängt vor allem von Ihrem tatsächlichen Alltag ab.`, {
+      html: `${sourceCardHtml(id)}${promptRailHtml([["Alltagspassung prüfen", `Passt der ${m.name} zu meinem Alltag?`], ["Mitsubishi-Alternative", `Mit welchem Mitsubishi sollte ich den ${m.name} vergleichen?`]])}`,
+      hint: `Offizielle Mitsubishi-Webseiten · geprüft am ${DATA_STAND}`
+    });
+  }
   if (/preis|kost|günstig|budget/.test(lower)) return assistantReply(`Der geprüfte Aktions-Ab-Preis des ${m.name} liegt bei ${m.price}, zuzüglich Überführungskosten. ${m.tradeoff}`, { html: promptRailHtml([["Passt er zu mir?", `Passt der ${m.name} zu meinem Alltag?`], ["Ehrlich vergleichen", `Mit welchem Mitsubishi sollte ich den ${m.name} vergleichen?`]]) });
   if (/reichweite/.test(lower) && id === "eclipse") return assistantReply("Mitsubishi nennt für den ECLIPSE CROSS mit 87-kWh-Batterie bis zu 627 km WLTP-Reichweite. Das ist ein Prüfstandswert; Wetter, Tempo und Klimatisierung beeinflussen die reale Reichweite. Entscheidend für die Empfehlung ist deshalb: Können Sie zuhause oder bei der Arbeit regelmäßig laden?");
   if (/verbrauch|effizienz|co2|emission/.test(lower)) return assistantReply(`Für den ${m.name} sind ${m.efficiency} und ${m.co2} ausgewiesen. Das sind offizielle Vergleichswerte; der reale Verbrauch hängt unter anderem von Fahrweise, Wetter, Verkehr und Ausstattung ab.`);
@@ -1135,7 +1164,8 @@ function sourceCardHtml(id) {
   if (!m) return "";
   return `<section class="source-card" aria-label="Geprüfte Daten ${m.name}">
     <div><span>OFFIZIELLE DATEN · ${DATA_STAND}</span><h3>${m.name}</h3><p>${m.label}</p></div>
-    <dl><div><dt>Preis</dt><dd>ab ${m.price}</dd></div><div><dt>Antrieb</dt><dd>${m.drive}</dd></div><div><dt>Verbrauch</dt><dd>${m.efficiency}</dd></div><div><dt>CO₂</dt><dd>${m.co2}</dd></div></dl>
+    <dl><div><dt>Aktionspreis</dt><dd>ab ${m.price}${m.promotion ? ` · ${m.promotion.discount} unter ${m.promotion.listPrice}` : ""}</dd></div><div><dt>Antrieb</dt><dd>${m.drive}</dd></div><div><dt>Verbrauch</dt><dd>${m.efficiency}</dd></div><div><dt>CO₂</dt><dd>${m.co2}</dd></div></dl>
+    <ul class="source-card__facts">${(m.verifiedFacts || []).map(fact => `<li>${escapeHtml(fact)}</li>`).join("")}</ul>
     <small>Quelle: Mitsubishi Motors Deutschland · im Prototyp geprüft und lokal dargestellt</small>
   </section>`;
 }
@@ -1166,24 +1196,28 @@ function nextPromptHtml(question, modelId) {
 
 async function askConnectedAI(question, modelId = state.recommended) {
   if (!aiConnection.enabled) return modelId && MODELS[modelId] ? answerVerifiedModelQuestion(question, modelId) : answerLocallyWithoutAI(question);
-  const fallback = () => assistantReply("Gemini ist gerade nicht erreichbar. Ich bleibe bei der geprüften Mitsubishi-Datenbasis, statt etwas zu erfinden.", { html: promptRailHtml([["Erneut versuchen", question], ["Verbindung prüfen", "__connect__"]]) });
+  const fallback = () => modelId && MODELS[modelId]
+    ? answerVerifiedModelQuestion(question, modelId)
+    : assistantReply("Gemini ist gerade nicht erreichbar. Ich bleibe bei der geprüften Mitsubishi-Datenbasis, statt etwas zu erfinden.", { html: promptRailHtml([["Erneut versuchen", question], ["Verbindung prüfen", "__connect__"]]) });
   const version = responseVersion;
   if (activeAIRequest) activeAIRequest.abort();
   const controller = new AbortController();
   activeAIRequest = controller;
+  const history = state.aiMessages.at(-1)?.role === "user" && state.aiMessages.at(-1)?.content === question
+    ? state.aiMessages.slice(0, -1)
+    : state.aiMessages;
   const typing = addTyping();
   try {
     const response = await fetch("/api/ai-chat", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ question, modelId, context: { answers: state.answers, recommended: state.recommended }, messages: state.aiMessages.slice(-6) }),
+      body: JSON.stringify({ question, modelId, context: { answers: state.answers, recommended: state.recommended, flow: state.flow, service: state.service }, messages: history.slice(-10) }),
       signal: controller.signal
     });
     const data = await response.json();
     if (version !== responseVersion) return null;
     if (!response.ok) { typing.remove(); return fallback(); }
     if (!data.answer) { typing.remove(); return fallback(); }
-    state.aiMessages.push({ role: "user", content: question }, { role: "assistant", content: data.answer });
     typing.remove();
     return addMessage("assistant", data.answer, { html: nextPromptHtml(question, modelId), hint: `Gemini · ${data.model} · geprüfter Mitsubishi-Kontext`, trainingMeta: { source: "gemini", model: data.model } });
   } catch (error) {
@@ -1272,7 +1306,7 @@ function setupAIConfig() {
   const key = form.querySelector("#ai-key");
   const keyLabel = form.querySelector("#ai-key-label");
   const providerDefaults = {
-    gemini: { model: "gemini-2.5-flash-lite", label: "Gemini API-Key", placeholder: "AQ… oder AIza…" },
+    gemini: { model: "gemini-3.1-flash-lite", label: "Gemini API-Key", placeholder: "AQ… oder AIza…" },
     openai: { model: "gpt-5-mini", label: "OpenAI API-Key", placeholder: "sk-…" }
   };
   if (STATIC_HOSTED) {

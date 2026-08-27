@@ -4,17 +4,22 @@ const assert = require("node:assert/strict");
 const {
   accessoryLabel,
   extractModelYear,
+  hasAdvisoryIntent,
+  hasAmbiguousAsxAlias,
   hasAccessoryIntent,
   hasDealerIntent,
   hasModelLocationIntent,
   hasNegatedTrialIntent,
   hasOfferLeadIntent,
-  hasPromotionIntent
+  hasPromotionIntent,
+  isBareCancellation
 } = require("../lib/caida-dialog");
 
 assert.equal(hasAccessoryIntent("Ich suche nach einer Frontlippe für meinen Outlander"), true);
 assert.equal(accessoryLabel("Ich suche nach einer Frontlippe"), "Frontlippe");
 assert.equal(hasAccessoryIntent("Wo finde ich Ersatzteile?"), true);
+assert.equal(hasAccessoryIntent("Wo finde ich Zubehöre für den Outlander, mein Heckflügel ist kaputt gegangen"), true);
+assert.equal(accessoryLabel("Mein Heckflügel ist kaputt gegangen"), "Heckflügel");
 assert.equal(hasAccessoryIntent("Ich brauche Teile"), true);
 assert.equal(hasAccessoryIntent("Welche Vorteile hat der ASX?"), false);
 assert.equal(hasDealerIntent("Bei welchem Händler finde ich das?"), true);
@@ -28,7 +33,14 @@ assert.equal(hasPromotionIntent("Ich meine Sonderaktionen oder so"), true);
 assert.equal(hasPromotionIntent("Ich möchte ein persönliches Angebot anfordern"), false);
 assert.equal(hasOfferLeadIntent("Ich möchte ein persönliches Angebot anfordern"), true);
 assert.equal(hasOfferLeadIntent("Gibt es gerade Angebote?"), false);
-assert.equal(hasOfferLeadIntent("Kann ich den Outlander leasen?"), true);
+assert.equal(hasOfferLeadIntent("Kann ich den Outlander leasen?"), false);
+assert.equal(hasOfferLeadIntent("Ich möchte ein Leasingangebot vorbereiten"), true);
+assert.equal(hasOfferLeadIntent("Warum sollte ich den Eclipse Cross kaufen?"), false);
+assert.equal(hasAdvisoryIntent("Warum sollte ich den Eclipse Cross kaufen?"), true);
+assert.equal(hasAdvisoryIntent("Nein, warum sollte ich ihn kaufen?"), true);
+assert.equal(isBareCancellation("Nein"), true);
+assert.equal(isBareCancellation("Nein, warum sollte ich ihn kaufen?"), false);
+assert.equal(hasAmbiguousAsxAlias("Warum sollte ich einen Sex kaufen?"), true);
 assert.equal(hasModelLocationIntent("Wo finde ich denn den Outlander?"), true);
 assert.equal(hasModelLocationIntent("Passt der Outlander zu mir?"), false);
 

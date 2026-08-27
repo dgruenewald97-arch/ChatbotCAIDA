@@ -1,5 +1,5 @@
 CAIDA – MITSUBISHI CONCEPT PROTOTYPE
-Stand: 25.08.2026
+Stand: 27.08.2026
 
 START
 1. START-CAIDA.bat doppelklicken.
@@ -34,7 +34,7 @@ DATENSCHUTZ
 
 DATENBASIS
 - Offizielle deutsche Mitsubishi-Webseiten und vorhandene offizielle Kampagnenassets.
-- Preise, Verbrauch und Verfügbarkeit: Stand 25.08.2026.
+- Preise, Verbrauch und Verfügbarkeit: Stand 27.08.2026.
 - Preis- und Ausstattungsänderungen vorbehalten; Überführungskosten sind nicht enthalten.
 
 TECHNIK
@@ -57,12 +57,14 @@ TECHNIK
   konfigurieren.
   Der Schlüssel bleibt nur im Arbeitsspeicher des lokalen Servers, wird nicht in
   Dateien gespeichert und ist nach Server-Neustart gelöscht.
-- Standard ist Gemini 3.5 Flash-Lite. Die Gesprächshistorie wird als echter
-  mehrteiliger Gemini-Dialog gesendet, nicht als einzelne isolierte Frage.
+- Standard auf Vercel ist Gemini 3.1 Flash-Lite mit niedriger Denkstufe. Die letzten
+  sichtbaren Nutzer- und CAIDA-Nachrichten werden als mehrteiliger Dialog gesendet,
+  nicht als einzelne isolierte Frage.
 - Die Gemini-Beraterrolle antwortet direkt, gibt eine begründete Tendenz, nennt
   einen fairen Haken und stellt höchstens eine entscheidende Rückfrage.
-- Händler-, Probefahrt- und Angebotsabsichten werden vor Gemini erkannt und in
-  kontrollierte Widgets geleitet. Wettbewerberdaten werden nur verglichen, wenn
+- Nur eindeutige Händler-, Probefahrt- und Angebotsabsichten werden in kontrollierte
+  Widgets geleitet. Wörter wie „kaufen“ oder „leasen“ allein bleiben Beratung.
+  Wettbewerberdaten werden nur verglichen, wenn
   sie im Gespräch als geprüfte Daten vorliegen.
 - Alternativ vor dem Start GEMINI_API_KEY
   oder OPENAI_API_KEY und optional CAIDA_AI_MODEL als Umgebungsvariablen setzen.

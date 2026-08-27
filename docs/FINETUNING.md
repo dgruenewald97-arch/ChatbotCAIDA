@@ -14,7 +14,7 @@ Für zentrale einzelne Wörter kann `hasNearWord()` verwendet werden. Die erlaub
 
 ## 2. Modell- oder Händlerdaten aktualisieren
 
-- Modelle: Objekt `MODELS` am Anfang von `app.js` und `<gepruefte-daten>` in `server.js` synchron ändern.
+- Modelle: ausschließlich `MODELS` in `lib/caida-facts.js` ändern. Browser-Widgets und KI-Prompt verwenden dieselbe Quelle.
 - Händlerdemo: `VERIFIED_DEALERS` in `app.js`.
 - Datenstand: `DATA_STAND` und Dokumentation aktualisieren.
 - Jede Zahl gegen die offizielle Quelle prüfen.
@@ -23,7 +23,7 @@ Nie stillschweigend neue Ausstattungs-, Garantie- oder Verfügbarkeitsangaben hi
 
 ## 3. Die KI-Antworten verbessern
 
-Die Systemanweisung liegt als `AI_INSTRUCTIONS` in `server.js`.
+Die gemeinsame Systemanweisung liegt als `AI_INSTRUCTIONS` in `lib/caida-ai.js`. Lokaler Server und Vercel-Endpunkt importieren dieselbe Version.
 
 Änderungen sollten anhand eines kleinen festen Testsets bewertet werden:
 
@@ -32,6 +32,10 @@ Die Systemanweisung liegt als `AI_INSTRUCTIONS` in `server.js`.
 - unbekanntes Ausstattungsdetail;
 - Familienprofil GRANDIS versus OUTLANDER;
 - Wunsch nach Händler oder Probefahrt.
+- Zubehörfrage mit genanntem Teil, zum Beispiel „Heckflügel“;
+- beratende Kauf-Frage nach einem Themenwechsel;
+- Pronomen-Rückfrage wie „Nein, warum sollte ich ihn kaufen?“;
+- Spracherkennungsfehler „Sex“ als mögliche ASX-Nennung.
 
 Transaktionale Intents gehören nicht in den Prompt allein. Sie müssen zusätzlich deterministisch im Client geroutet werden.
 
@@ -91,4 +95,3 @@ Nicht weiter mit Einzelpatches arbeiten, wenn:
 - produktive Daten ohne automatisierbare Quelle wachsen.
 
 Dann zuerst Zustand, Komponenten- oder Datenarchitektur vereinheitlichen.
-

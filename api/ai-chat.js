@@ -19,7 +19,7 @@ module.exports = async function handler(req, res) {
     const question = String(payload?.question || "").trim().slice(0, 1200);
     if (!question) return sendJson(res, 400, { error: "Frage fehlt." });
     const context = { modelId: payload?.modelId || null, profile: payload?.context || {} };
-    const messages = Array.isArray(payload?.messages) ? payload.messages.slice(-6) : [];
+    const messages = Array.isArray(payload?.messages) ? payload.messages.slice(-10) : [];
     const { response, result, answer, model } = await generateGeminiAnswer({ key, question, messages, context });
     if (!response.ok) {
       const code = String(result?.error?.status || "UPSTREAM_ERROR");

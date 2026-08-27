@@ -3,6 +3,7 @@
 const http = require("http");
 const fs = require("fs");
 const path = require("path");
+const { AI_INSTRUCTIONS: SHARED_AI_INSTRUCTIONS } = require("./lib/caida-ai");
 
 const HOST = "127.0.0.1";
 const PORT = Number(process.env.CAIDA_PORT || 4177);
@@ -22,7 +23,7 @@ const MIME = {
 
 let aiProvider = process.env.GEMINI_API_KEY ? "gemini" : process.env.OPENAI_API_KEY ? "openai" : "none";
 let aiKey = process.env.GEMINI_API_KEY || process.env.OPENAI_API_KEY || "";
-let aiModel = process.env.CAIDA_AI_MODEL || (aiProvider === "openai" ? "gpt-5-mini" : "gemini-2.5-flash-lite");
+let aiModel = process.env.CAIDA_AI_MODEL || (aiProvider === "openai" ? "gpt-5-mini" : "gemini-3.1-flash-lite");
 let lastAIError = null;
 let aiConfiguredAt = aiKey ? new Date().toISOString() : null;
 const AI_INSTRUCTIONS = `<rolle>
@@ -170,7 +171,7 @@ async function requestOpenAI(input) {
   const response = await fetch("https://api.openai.com/v1/responses", {
     method: "POST",
     headers: { "Authorization": `Bearer ${aiKey}`, "Content-Type": "application/json" },
-    body: JSON.stringify({ model: aiModel, instructions: AI_INSTRUCTIONS, input, max_output_tokens: 280, store: false })
+    body: JSON.stringify({ model: aiModel, instructions: SHARED_AI_INSTRUCTIONS, input, max_output_tokens: 340, store: false })
   });
   const result = await response.json();
   const answer = result.output?.flatMap(item => item.content || []).find(item => item.type === "output_text")?.text?.trim();
@@ -196,7 +197,7 @@ async function requestGemini(question, messages, context) {
     method: "POST",
     headers: { "x-goog-api-key": aiKey, "Content-Type": "application/json" },
     body: JSON.stringify({
-      systemInstruction: { parts: [{ text: `${AI_INSTRUCTIONS}\nAktueller, vom Nutzer sichtbarer Beratungskontext: ${JSON.stringify(context || {}).slice(0, 1800)}` }] },
+      systemInstruction: { parts: [{ text: `${SHARED_AI_INSTRUCTIONS}\nAktueller, vom Nutzer sichtbarer Beratungskontext: ${JSON.stringify(context || {}).slice(0, 1800)}` }] },
       contents: buildGeminiContents(messages, question),
       generationConfig: { temperature: 0.3, maxOutputTokens: 280 }
     })
@@ -217,7 +218,7 @@ const server = http.createServer(async (req, res) => {
       const payload = JSON.parse(await readBody(req));
       const provider = String(payload?.provider || "gemini").trim().toLowerCase();
       const key = String(payload?.key || "").trim();
-      const model = String(payload?.model || (provider === "openai" ? "gpt-5-mini" : "gemini-2.5-flash-lite")).trim();
+      const model = String(payload?.model || (provider === "openai" ? "gpt-5-mini" : "gemini-3.1-flash-lite")).trim();
       if (!/^(gemini|openai)$/.test(provider)) return sendJson(res, 400, { error: "Unbekannter KI-Anbieter." });
       const keyIsValid = provider === "gemini" ? isPlausibleSecret(key) : /^sk-[A-Za-z0-9_-]{20,}$/.test(key);
       if (!keyIsValid) return sendJson(res, 400, { error: `Der ${providerLabel(provider)} API-Key hat kein gültiges Format.` });

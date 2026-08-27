@@ -4,7 +4,7 @@
 
 CAIDA ist ein Mobile-First-Konzept für eine Mitsubishi Modellberatung, die vollständig im Chat stattfindet. Der Assistent berät, merkt sich relevanten Kontext und wechselt bei transaktionalen Absichten in kontrollierte Widgets für Händlersuche, Probefahrt und Angebotsvorbereitung.
 
-> **Concept Prototype:** Dieses Repository ist keine offizielle Mitsubishi-Anwendung. Preise und Modelldaten sind ein redaktioneller Snapshot vom 25.08.2026. Die Demo sendet keine Anfrage an Mitsubishi oder Händler.
+> **Concept Prototype:** Dieses Repository ist keine offizielle Mitsubishi-Anwendung. Preise und Modelldaten sind ein redaktioneller Snapshot vom 27.08.2026. Die Demo sendet keine Anfrage an Mitsubishi oder Händler.
 
 ## Was man ausprobieren kann
 
@@ -55,7 +55,7 @@ flowchart LR
   C -->|nur nach Einwilligung| T[Redaktion + privates Lernprotokoll]
 ```
 
-Die transaktionalen Wege laufen immer vor der freien KI. Dadurch kann ein Modell weder Händler erfinden noch behaupten, eine Probefahrt sei gebucht worden.
+Der Router öffnet Widgets nur bei einer eindeutigen transaktionalen Absicht. Normale Kaufberatung bleibt ein Gespräch; Gemini erhält dafür die letzten sichtbaren Nutzer- und CAIDA-Nachrichten, einschließlich des Textkontexts aus lokalen Widget-Schritten. Das Modell darf selbst weder Händler erfinden noch einen Widget-Vorgang starten oder als versendet ausgeben.
 
 ## Projektstruktur
 
@@ -66,7 +66,7 @@ Die transaktionalen Wege laufen immer vor der freien KI. Dadurch kann ein Modell
 ├── app.js                     Dialogzustand, Intent-Routing und UI-Flows
 ├── server.js                  Statischer Server und optionaler KI-Gateway
 ├── api/                       Vercel Functions für Status, Chat und Demo-Flow
-├── lib/                       Gemeinsame KI- und HTTP-Sicherheitslogik
+├── lib/                       Gemeinsame Fakten-, KI-, Dialog- und Sicherheitslogik
 ├── vercel.json                Functions- und Security-Header-Konfiguration
 ├── assets/                    Fahrzeug-, Marken- und Bot-Assets
 ├── docs/

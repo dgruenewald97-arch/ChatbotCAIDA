@@ -10,7 +10,7 @@
   <meta property="og:type" content="website">
   <title>CAIDA · Mitsubishi Concept Prototype</title>
   <link rel="icon" type="image/png" href="assets/caida-bot.png">
-  <link rel="stylesheet" href="styles.css?v=20260827-2">
+  <link rel="stylesheet" href="styles.css?v=20260827-3">
 </head>
 <body>
   <header class="site-header">
@@ -48,7 +48,7 @@
         <img id="hero-car" src="assets/grandis.webp" alt="">
         <p id="hero-model">GRANDIS</p>
       </div>
-      <div class="hero__footer"><span>Offizielle Modellinformationen</span><span>Stand 25.08.2026</span></div>
+      <div class="hero__footer"><span>Offizielle Modellinformationen</span><span>Stand 27.08.2026</span></div>
     </section>
 
   </main>
@@ -115,7 +115,7 @@
     <div class="scenario-list" id="scenario-list"></div>
     <details class="source-details">
       <summary>Datenbasis & Logik</summary>
-      <p>Aktuelle deutsche Mitsubishi-Modellseiten, Preise und Verbrauchswerte. Stand 25.08.2026.</p>
+      <p>Aktuelle deutsche Mitsubishi-Modellseiten, Preise und Verbrauchswerte. Stand 27.08.2026.</p>
       <p>Quellen werden im Nutzererlebnis als geprüfte Datenkarte direkt im Chat dargestellt.</p>
     </details>
     <details class="ai-config-details">
@@ -130,7 +130,7 @@
         <label for="ai-key" id="ai-key-label">Gemini API-Key</label>
         <input id="ai-key" name="key" type="password" autocomplete="off" autocapitalize="none" spellcheck="false" placeholder="AQ… oder AIza…" required>
         <label for="ai-model">Modell</label>
-        <input id="ai-model" name="model" value="gemini-2.5-flash-lite" autocomplete="off">
+        <input id="ai-model" name="model" value="gemini-3.1-flash-lite" autocomplete="off">
         <button class="button button--primary" type="submit">KI im Chat verbinden</button>
       </form>
       <p id="ai-config-message" role="status"></p>
@@ -162,7 +162,8 @@
     </article>
   </template>
 
-  <script src="lib/caida-dialog.js?v=20260827-2" defer></script>
-  <script src="app.js?v=20260827-2" defer></script>
+  <script src="lib/caida-facts.js?v=20260827-3" defer></script>
+  <script src="lib/caida-dialog.js?v=20260827-3" defer></script>
+  <script src="app.js?v=20260827-3" defer></script>
 </body>
 </html>

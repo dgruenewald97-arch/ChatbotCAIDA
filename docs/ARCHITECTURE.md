@@ -18,7 +18,7 @@ Mobile-First Styles für Landingpage, Chat, Karten, Formulare, Stepper und Motio
 
 Besitzt vier Verantwortungsbereiche:
 
-1. verifizierte Modell- und Händlerdaten;
+1. Darstellung der gemeinsamen verifizierten Modell- und Händlerdaten;
 2. Gesprächszustand in `state`;
 3. Intent-Routing in `handleUserText()`;
 4. Rendering und Interaktion der Chat-Widgets.
@@ -27,7 +27,7 @@ Der Zustand trennt Beratung und Transaktion:
 
 ```js
 state.answers       // Nutzung, Antrieb, Laden, Budget, Modellinteresse
-state.aiMessages    // gekürzte Mehrturn-Historie für den lokalen KI-Gateway
+state.aiMessages    // sichtbare Nutzer- und CAIDA-Nachrichten, inkl. lokaler Widget-Texte
 state.transaction   // Modell, PLZ, Händler, Wunschzeit, Angebotsart, Kontakt
 ```
 
@@ -54,6 +54,7 @@ Die Vercel-Version läuft unter derselben Origin wie das Frontend:
 - `api/training-export.js` stellt einen Bearer-geschützten JSON-/JSONL-Export bereit;
 - `api/training-retention.js` löscht per täglichem Cron Daten nach 30 Tagen.
 - `lib/caida-ai.js` besitzt den serverseitigen Prompt, die geprüfte Interactions-Modell-Allowlist und harte Kontext-/Antwortgrenzen;
+- `lib/caida-facts.js` ist die gemeinsame, datierte Faktenquelle für Browser-Widgets und KI-Prompt;
 - `GEMINI_API_KEY` wird ausschließlich aus Vercel Environment Variables gelesen.
 
 Auf Vercel wird niemals ein API-Key-Formular angeboten. Das Frontend erkennt den Modus über `managed: true` aus `/api/ai-status`.
@@ -62,15 +63,15 @@ Auf Vercel wird niemals ein API-Key-Formular angeboten. Das Frontend erkennt den
 
 Die Reihenfolge ist ein Sicherheitsvertrag:
 
-1. Reset und aktive Flow-Zustände;
-2. Wettbewerbervergleich mit Faktenbegrenzung;
-3. Probefahrt, Angebot und Händler;
-4. Service und lokale Mitsubishi-Vergleiche;
+1. Reset, eindeutige Korrekturen und reine Abbrüche;
+2. Zubehör- und Servicefälle;
+3. beratende Rückfragen wie „Warum sollte ich ihn kaufen?“;
+4. explizite Probefahrt-, Angebots- und Händlerabsichten;
 5. verifizierte Modellfragen;
-6. freie KI-Frage, sofern lokal aktiviert;
+6. freie KI-Frage, sofern aktiviert;
 7. lokale Beratungslogik als Fallback.
 
-Transaktionale Absichten dürfen nie hinter dem KI-Aufruf stehen. Andernfalls könnte das Sprachmodell eine Buchung simulieren oder Händler erfinden.
+Nur explizite transaktionale Absichten dürfen Widgets öffnen. Ein einzelnes Wort wie „kaufen“ oder „leasen“ bleibt Beratung; dadurch verdrängt ein Formular nicht die eigentliche Nutzerfrage. Gemini sieht die letzten sichtbaren Chatnachrichten, darf Widgets aber weder selbst starten noch einen Versand behaupten.
 
 ## GitHub-Pages-Modus
 

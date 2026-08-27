@@ -649,6 +649,9 @@ button { color: inherit; }
 .source-card dl > div { display: grid; grid-template-columns: 78px 1fr; gap: 10px; padding: 9px 0; border-top: 1px solid var(--line); }
 .source-card dt { color: var(--muted); font-size: 9px; text-transform: uppercase; letter-spacing: .08em; }
 .source-card dd { margin: 0; font-size: 11px; font-weight: 700; line-height: 1.35; }
+.source-card__facts { display: grid; gap: 7px; margin: -2px 0 14px; padding: 0; list-style: none; }
+.source-card__facts li { position: relative; padding-left: 14px; color: #383838; font-size: 10px; line-height: 1.4; }
+.source-card__facts li::before { content: ""; position: absolute; top: .55em; left: 0; width: 5px; height: 5px; background: var(--red); }
 .source-card small { color: var(--muted); font-size: 9px; line-height: 1.4; }
 
 .world-card { margin-top: 15px; padding: 16px; background: rgba(255,255,255,.78); border: 1px solid var(--line); border-radius: 12px; box-shadow: 0 10px 30px rgba(0,0,0,.055); animation: card-reveal .58s .08s cubic-bezier(.16,1,.3,1) both; }

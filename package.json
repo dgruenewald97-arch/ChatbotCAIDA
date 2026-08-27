@@ -6,7 +6,7 @@
   "scripts": {
     "start": "node server.js",
     "training:export": "node --env-file=.env.local scripts/export-training.js",
-    "check": "node --check app.js && node --check server.js && node --check lib/caida-ai.js && node --check lib/caida-http.js && node --check lib/caida-training.js && node --check lib/caida-dialog.js && node --check api/ai-status.js && node --check api/ai-chat.js && node --check api/demo-lead.js && node --check api/health.js && node --check api/training-status.js && node --check api/training-event.js && node --check api/training-export.js && node --check api/training-retention.js && node scripts/smoke-api.js && node scripts/test-training.js && node scripts/test-dialog.js"
+    "check": "node --check app.js && node --check server.js && node --check lib/caida-ai.js && node --check lib/caida-facts.js && node --check lib/caida-http.js && node --check lib/caida-training.js && node --check lib/caida-dialog.js && node --check api/ai-status.js && node --check api/ai-chat.js && node --check api/demo-lead.js && node --check api/health.js && node --check api/training-status.js && node --check api/training-event.js && node --check api/training-export.js && node --check api/training-retention.js && node scripts/smoke-api.js && node scripts/test-training.js && node scripts/test-dialog.js && node scripts/test-facts.js"
   },
   "engines": {
     "node": "22.x"
