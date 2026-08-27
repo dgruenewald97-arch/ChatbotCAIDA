@@ -171,7 +171,7 @@ async function requestOpenAI(input) {
   const response = await fetch("https://api.openai.com/v1/responses", {
     method: "POST",
     headers: { "Authorization": `Bearer ${aiKey}`, "Content-Type": "application/json" },
-    body: JSON.stringify({ model: aiModel, instructions: SHARED_AI_INSTRUCTIONS, input, max_output_tokens: 340, store: false })
+    body: JSON.stringify({ model: aiModel, instructions: SHARED_AI_INSTRUCTIONS, input, max_output_tokens: 700, store: false })
   });
   const result = await response.json();
   const answer = result.output?.flatMap(item => item.content || []).find(item => item.type === "output_text")?.text?.trim();
@@ -199,7 +199,7 @@ async function requestGemini(question, messages, context) {
     body: JSON.stringify({
       systemInstruction: { parts: [{ text: `${SHARED_AI_INSTRUCTIONS}\nAktueller, vom Nutzer sichtbarer Beratungskontext: ${JSON.stringify(context || {}).slice(0, 1800)}` }] },
       contents: buildGeminiContents(messages, question),
-      generationConfig: { temperature: 0.3, maxOutputTokens: 280 }
+      generationConfig: { temperature: 0.3, maxOutputTokens: 700 }
     })
   });
   const result = await response.json();
