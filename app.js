@@ -7,7 +7,16 @@ const TRAINING_CONSENT_KEY = "caida-training-consent-v1";
 const TRAINING_SESSION_KEY = "caida-training-session-v1";
 const TRAINING_DELETE_KEY = "caida-training-delete-v1";
 const TRAINING_SEQUENCE_KEY = "caida-training-sequence-v1";
-const { accessoryLabel, extractModelYear, hasAccessoryIntent, hasDealerIntent, hasNegatedTrialIntent } = window.CAIDA_DIALOG;
+const {
+  accessoryLabel,
+  extractModelYear,
+  hasAccessoryIntent,
+  hasDealerIntent,
+  hasModelLocationIntent,
+  hasNegatedTrialIntent,
+  hasOfferLeadIntent,
+  hasPromotionIntent
+} = window.CAIDA_DIALOG;
 
 const MODELS = {
   asx: {
@@ -126,6 +135,16 @@ let voiceConsent = null;
 let aiConnection = { enabled: false, provider: "none", model: null, lastError: null };
 let trainingConnection = { available: false, retentionDays: 30, lastWriteOk: null };
 let trainingConsent = readTrainingConsent();
+let responseVersion = 0;
+let activeAIRequest = null;
+
+function cancelPendingResponses() {
+  responseVersion += 1;
+  if (activeAIRequest) activeAIRequest.abort();
+  activeAIRequest = null;
+  els.conversation?.querySelectorAll('[data-typing="true"]').forEach(node => node.remove());
+  return responseVersion;
+}
 
 function storageRead(storage, key) {
   try { return storage.getItem(key); } catch { return null; }
@@ -307,6 +326,7 @@ function addMessage(role, text, options = {}) {
   node.classList.toggle("message--user", role === "user");
   node.setAttribute("aria-label", role === "user" ? "Sie" : "CAIDA");
   const body = node.querySelector(".message__body");
+  if (options.html) node.classList.add("message--with-widget");
   if (text) body.appendChild(createBubble(text));
   if (options.html) body.insertAdjacentHTML("beforeend", options.html);
   if (options.hint) {
@@ -332,9 +352,14 @@ function addTyping() {
 }
 
 async function assistantReply(text, options = {}, delay = null) {
+  const version = responseVersion;
   const typing = addTyping();
   const humanDelay = delay ?? Math.min(960, 300 + String(text).length * 3.4);
   await new Promise(resolve => setTimeout(resolve, humanDelay));
+  if (version !== responseVersion) {
+    typing.remove();
+    return null;
+  }
   typing.remove();
   return addMessage("assistant", text, options);
 }
@@ -526,13 +551,17 @@ async function openAdvisorPrompt() {
 }
 
 function resetConversation(scenario = null) {
+  const version = cancelPendingResponses();
   state = freshState();
   els.conversation.replaceChildren();
   updateContextStrip();
   updateHero("grandis");
   const intro = addMessage("assistant", "Hallo, ich bin CAIDA.\n\nFragen Sie mich einfach zu Modellen, Antrieben, Alltag, Kosten oder Service. Ich gebe Ihnen eine klare Tendenz, nenne den Haken und frage nur nach, wenn es die Empfehlung wirklich verändert.", { html: greetingHtml(), hint: introHint() });
   intro.dataset.introMessage = "true";
-  if (scenario) setTimeout(() => launchScenario(scenario), 280);
+  if (scenario) setTimeout(() => {
+    if (version === responseVersion) launchScenario(scenario);
+  }, 280);
+  return version;
 }
 
 function parseInput(raw) {
@@ -544,7 +573,7 @@ function parseInput(raw) {
   if (/famil|kind|kinder|kinderwagen|gepäck|platz|urlaub/.test(text)) parsed.use = "family";
   else if (/stadt|city|parken|pendel|kompakt/.test(text)) parsed.use = "city";
   else if (/autobahn|langstrecke|weite strecke|vielfahrer/.test(text)) parsed.use = "long";
-  else if (/alltag|gemischt|alles/.test(text)) parsed.use = "mixed";
+  else if (/gemischt|querbeet|von allem|unterschiedlich/.test(text)) parsed.use = "mixed";
   if (/fünf|5 personen|große familie|viel gepäck/.test(text)) parsed.people = "large";
   else if (/vier|4 personen|drei|3 personen/.test(text)) parsed.people = "medium";
   else if (/allein|zu zweit|2 personen/.test(text)) parsed.people = "small";
@@ -564,9 +593,24 @@ function mergeParsed(parsed) {
   updateContextStrip();
 }
 
+function answerPromotionQuestion(parsed) {
+  state.flow = "start";
+  state.transaction.kind = null;
+  const modelId = parsed.models[0] || state.answers.interest || state.recommended;
+  const model = modelId && MODELS[modelId];
+  const subject = model ? `für den ${model.name}` : "für die Mitsubishi Modelle";
+  return assistantReply(`Sie fragen nach einer aktuell laufenden Sonder- oder Preisaktion ${subject} – nicht nach einem persönlichen Händlerangebot. Dazu enthält diese Demo keinen live verifizierten Aktionsfeed. Belegt ist${model ? ` beim ${model.name} der Einstieg ab ${model.price}` : " nur die angezeigte Preisbasis"}; ob darüber hinaus gerade ein Bonus oder Rabatt gilt, behaupte ich deshalb nicht.`, {
+    html: model
+      ? `${sourceCardHtml(model.id)}${promptRailHtml([["Persönliches Angebot vorbereiten", `Ich möchte ein persönliches Angebot für den ${model.name} vorbereiten.`], ["Modell einordnen", `Passt der ${model.name} zu meinem Alltag?`]])}`
+      : promptRailHtml([["Modelle & Preise", "Was sind die geprüften Preise der Mitsubishi Modelle?"], ["Persönliches Angebot", "Ich möchte ein persönliches Angebot vorbereiten."]]),
+    hint: "Aktionsstatus nicht live geprüft"
+  });
+}
+
 async function handleUserText(raw) {
   const text = raw.trim();
   if (!text) return;
+  cancelPendingResponses();
   addMessage("user", text);
   const lower = text.toLowerCase();
   const competitorMention = /renault|captur|peugeot|citro[eë]n|vw|volkswagen|toyota|hyundai|kia|skoda|wettbewerb|andere marke/.test(lower);
@@ -577,6 +621,7 @@ async function handleUserText(raw) {
   if (/neu starten|zurücksetzen|reset/.test(lower)) return resetConversation();
   if (hasNegatedTrialIntent(lower) && (state.transaction.kind === "trial" || state.flow === "trial-select")) return cancelTrialFlow();
   if (hasAccessoryIntent(lower)) return startAccessoryRequest(text, parsed.models[0]);
+  if (hasPromotionIntent(lower)) return answerPromotionQuestion(parsed);
   if (/^\s*(?:nein|abbrechen|stop(?:pen)?|doch nicht)\b/.test(lower) && state.flow === "transaction") {
     if (state.transaction.kind === "trial") return cancelTrialFlow();
     state.flow = "start";
@@ -615,9 +660,19 @@ async function handleUserText(raw) {
     state.flow = "trial-select";
     return assistantReply("Welches Modell möchten Sie probefahren? Danach wählen Sie Händler, Wunschzeit und Kontaktdaten Schritt für Schritt im Chat.", { html: modelChoiceHtml("trial-model") });
   }
-  if (/angebot|finanzier|leasing|kaufpreis|kaufen/.test(lower)) {
+  if (hasOfferLeadIntent(lower) || (/\bangebot\b/.test(lower) && !hasPromotionIntent(lower))) {
     const modelId = parsed.models[0] || state.recommended || state.answers.interest;
     return openOffer(modelId);
+  }
+  if (parsed.models.length === 1 && hasModelLocationIntent(lower)) {
+    const model = MODELS[parsed.models[0]];
+    state.answers.interest = model.id;
+    return assistantReply(`Meinen Sie, wo Sie den ${model.name} bei einem Mitsubishi-Partner finden – oder möchten Sie das Modell hier im Chat ansehen?`, {
+      html: choicesHtml([
+        ["Händler in meiner Nähe", `Händler für den ${model.name} finden`],
+        ["Modell hier ansehen", `Was ist zum ${model.name} sicher belegt?`]
+      ], "context-sample")
+    });
   }
   if (/händler|autohaus|mitsubishi.partner|partner (finden|suchen)/.test(lower)) {
     const postcode = text.match(/\b\d{5}\b/)?.[0] || "";
@@ -638,6 +693,10 @@ async function handleUserText(raw) {
     return continueCompare();
   }
   if (competitorMention) return answerCompetitorSafely(text, parsed.models[0] || state.recommended || state.answers.interest);
+  if (/welcher\s+(?:mitsubishi|antrieb|wagen|suv)|welches\s+(?:modell|auto)|passt\s+(?:zu mir|zu meinem alltag)|empfehl/.test(lower)) {
+    state.flow = "advisor";
+    return askNextQuestion(Object.keys(state.answers).length > 0);
+  }
   if (aiConnection.enabled) return askConnectedAI(text, parsed.models[0] || state.recommended);
   if (state.recommended) return answerFollowUp(text);
   if (parsed.models.length === 1 && !Object.keys(state.answers).length) {
@@ -889,8 +948,10 @@ function renderRecommendation(id, alternative, primary) {
 function updateHero(id) {
   const m = MODELS[id];
   if (!m || !els.heroCar) return;
+  const version = responseVersion;
   els.heroCar.classList.add("is-changing");
   setTimeout(() => {
+    if (version !== responseVersion) return;
     els.heroCar.src = m.image;
     els.heroModel.textContent = m.name;
     if (els.heroModelLabel) els.heroModelLabel.textContent = m.name;
@@ -949,12 +1010,27 @@ function conciseFit(id) {
   }[id];
 }
 
+function comparisonVerdict(aId, bId) {
+  const pair = new Set([aId, bId]);
+  if (pair.has("grandis") && pair.has("outlander")) {
+    return "Der GRANDIS ist die schlüssigere Wahl, wenn Sie Hybrid ohne externe Ladeplanung und den niedrigeren belegten Einstiegspreis möchten. Der OUTLANDER gewinnt, wenn regelmäßiges Laden und 4WD wirklich zu Ihrem Alltag gehören. Raum- und Komfortunterschiede sind in dieser Demo nicht belastbar belegt.";
+  }
+  if (pair.has("asx") && pair.has("outlander")) {
+    return "Der ASX ist die preislich vernünftigere Wahl und bietet Antriebe ohne externe Ladepflicht. Der OUTLANDER ist die gezieltere Wahl für Plug-in Hybrid und 4WD – aber nur, wenn regelmäßiges Laden realistisch ist. Platz und Komfort vergleiche ich ohne geprüfte Maße nicht.";
+  }
+  if (pair.has("asx") && pair.has("grandis")) {
+    return "ASX und GRANDIS liegen bei den belegten Hybrid-Verbrauchswerten gleichauf. Der ASX startet günstiger; der GRANDIS ist als Familien-SUV positioniert. Welche Wahl wirklich besser passt, entscheidet daher Ihr Platzbedarf – konkrete Innenraummaße sind in dieser Demo noch nicht verifiziert.";
+  }
+  if (pair.has("eclipse") && pair.has("outlander")) {
+    return "Der ECLIPSE CROSS ist die konsequente vollelektrische Wahl mit bis zu 627 km WLTP. Der OUTLANDER kombiniert Plug-in Hybrid mit 4WD. Ohne zuverlässige Lademöglichkeit ist keiner von beiden sinnvoll eingeordnet; Ladegeschwindigkeit und elektrische OUTLANDER-Reichweite sind hier nicht belegt.";
+  }
+  const a = MODELS[aId], b = MODELS[bId];
+  return `${a.name}: ${a.drive}, Einstieg ab ${a.price}. ${b.name}: ${b.drive}, Einstieg ab ${b.price}. Eine klare Empfehlung gebe ich erst, wenn ich weiß, was Ihren Alltag am stärksten prägt.`;
+}
+
 async function renderComparison(aId, bId) {
   state.compare = [aId, bId];
-  const a = MODELS[aId], b = MODELS[bId];
-  let verdict = `Der ${a.name} ist die bessere Wahl, wenn ${conciseFit(aId).toLowerCase()} zählt. Der ${b.name} gewinnt, wenn ${conciseFit(bId).toLowerCase()} wichtiger ist.`;
-  if ([aId, bId].includes("grandis") && [aId, bId].includes("outlander")) verdict = "Der Grandis ist der ruhigere, effizientere Familien-Allrounder ohne Ladepflicht. Der Outlander lohnt sich, wenn Sie regelmäßig laden, mehr Leistung und 4WD wirklich nutzen.";
-  await assistantReply(verdict);
+  await assistantReply(comparisonVerdict(aId, bId));
   updateHero(aId);
   return assistantReply("", { html: compareHtml(aId, bId), hint: `Belegte deutsche Modelldaten · Stand ${DATA_STAND}` }, 240);
 }
@@ -1091,14 +1167,20 @@ function nextPromptHtml(question, modelId) {
 async function askConnectedAI(question, modelId = state.recommended) {
   if (!aiConnection.enabled) return modelId && MODELS[modelId] ? answerVerifiedModelQuestion(question, modelId) : answerLocallyWithoutAI(question);
   const fallback = () => assistantReply("Gemini ist gerade nicht erreichbar. Ich bleibe bei der geprüften Mitsubishi-Datenbasis, statt etwas zu erfinden.", { html: promptRailHtml([["Erneut versuchen", question], ["Verbindung prüfen", "__connect__"]]) });
+  const version = responseVersion;
+  if (activeAIRequest) activeAIRequest.abort();
+  const controller = new AbortController();
+  activeAIRequest = controller;
   const typing = addTyping();
   try {
     const response = await fetch("/api/ai-chat", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ question, modelId, context: { answers: state.answers, recommended: state.recommended }, messages: state.aiMessages.slice(-6) })
+      body: JSON.stringify({ question, modelId, context: { answers: state.answers, recommended: state.recommended }, messages: state.aiMessages.slice(-6) }),
+      signal: controller.signal
     });
     const data = await response.json();
+    if (version !== responseVersion) return null;
     if (!response.ok) { typing.remove(); return fallback(); }
     if (!data.answer) { typing.remove(); return fallback(); }
     state.aiMessages.push({ role: "user", content: question }, { role: "assistant", content: data.answer });
@@ -1106,7 +1188,10 @@ async function askConnectedAI(question, modelId = state.recommended) {
     return addMessage("assistant", data.answer, { html: nextPromptHtml(question, modelId), hint: `Gemini · ${data.model} · geprüfter Mitsubishi-Kontext`, trainingMeta: { source: "gemini", model: data.model } });
   } catch (error) {
     typing.remove();
+    if (error.name === "AbortError" || version !== responseVersion) return null;
     return fallback();
+  } finally {
+    if (activeAIRequest === controller) activeAIRequest = null;
   }
 }
 
@@ -1472,6 +1557,7 @@ function bindDynamicActions(root) {
   root.querySelectorAll("[data-action]").forEach(button => {
     button.addEventListener("click", async () => {
       const { action, value } = button.dataset;
+      if (action !== "focus-input") cancelPendingResponses();
       const actionSurface = button.closest(".flow-card") || button.closest(".choice-grid, .prompt-rail");
       if (actionSurface && action !== "focus-input") {
         actionSurface.classList.add("is-complete");
@@ -1652,8 +1738,9 @@ document.querySelectorAll("[data-close-concept]").forEach(button => button.addEv
 document.querySelectorAll("[data-open-chat]").forEach(button => button.addEventListener("click", () => openChat()));
 document.querySelectorAll("[data-chat-prompt]").forEach(button => button.addEventListener("click", async () => {
   openChat(false);
-  resetConversation();
+  const version = resetConversation();
   await new Promise(resolve => setTimeout(resolve, 180));
+  if (version !== responseVersion) return;
   handleUserText(button.dataset.chatPrompt);
 }));
 document.querySelectorAll("[data-close-chat]").forEach(button => button.addEventListener("click", closeChat));
