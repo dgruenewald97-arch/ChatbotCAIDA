@@ -18,7 +18,8 @@ const {
   hasNegatedTrialIntent,
   hasOfferLeadIntent,
   hasPromotionIntent,
-  isBareCancellation
+  isBareCancellation,
+  normalizeAdvisoryQuestion
 } = window.CAIDA_DIALOG;
 
 const MODELS = {
@@ -1206,12 +1207,13 @@ async function askConnectedAI(question, modelId = state.recommended) {
   const history = state.aiMessages.at(-1)?.role === "user" && state.aiMessages.at(-1)?.content === question
     ? state.aiMessages.slice(0, -1)
     : state.aiMessages;
+  const questionForAI = normalizeAdvisoryQuestion(question);
   const typing = addTyping();
   try {
     const response = await fetch("/api/ai-chat", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ question, modelId, context: { answers: state.answers, recommended: state.recommended, flow: state.flow, service: state.service }, messages: history.slice(-10) }),
+      body: JSON.stringify({ question: questionForAI, modelId, context: { answers: state.answers, recommended: state.recommended, flow: state.flow, service: state.service, intent: hasAdvisoryIntent(question) ? "advisory" : "free" }, messages: history.slice(-10) }),
       signal: controller.signal
     });
     const data = await response.json();

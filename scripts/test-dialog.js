@@ -12,7 +12,8 @@ const {
   hasNegatedTrialIntent,
   hasOfferLeadIntent,
   hasPromotionIntent,
-  isBareCancellation
+  isBareCancellation,
+  normalizeAdvisoryQuestion
 } = require("../lib/caida-dialog");
 
 assert.equal(hasAccessoryIntent("Ich suche nach einer Frontlippe für meinen Outlander"), true);
@@ -40,6 +41,8 @@ assert.equal(hasAdvisoryIntent("Warum sollte ich den Eclipse Cross kaufen?"), tr
 assert.equal(hasAdvisoryIntent("Nein, warum sollte ich ihn kaufen?"), true);
 assert.equal(isBareCancellation("Nein"), true);
 assert.equal(isBareCancellation("Nein, warum sollte ich ihn kaufen?"), false);
+assert.equal(normalizeAdvisoryQuestion("Nein, warum sollte ich ihn kaufen?"), "warum sollte ich ihn kaufen?");
+assert.equal(normalizeAdvisoryQuestion("Nein, ich kann nicht laden."), "Nein, ich kann nicht laden.");
 assert.equal(hasAmbiguousAsxAlias("Warum sollte ich einen Sex kaufen?"), true);
 assert.equal(hasModelLocationIntent("Wo finde ich denn den Outlander?"), true);
 assert.equal(hasModelLocationIntent("Passt der Outlander zu mir?"), false);
